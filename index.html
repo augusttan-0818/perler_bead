@@ -855,7 +855,8 @@
                 </div>
                 <div class="inventory-controls">
                     <button class="btn-primary" onclick="openAddColorModal()">+ Add Color</button>
-                    <button class="btn-secondary" onclick="initDefaultColors()">Initialize 211 Colors</button>
+                    <button class="btn-secondary" onclick="initDefaultColors()">Add MARD 221 Colors</button>
+                    <button class="btn-danger" onclick="resetToMardColors()">RESET to MARD 221 (Clear All)</button>
                 </div>
                 <div class="inventory-grid" id="inventory-grid">
                     <!-- Bead items will be generated here -->
@@ -1364,7 +1365,7 @@
                            style="${c.quantity < 200 ? 'border-color: var(--warning);' : ''}">
                     <button class="btn-sm btn-danger" onclick="deleteColor('${c.id}')">X</button>
                 </div>
-            `).join('') || '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No inventory. Click "Initialize 211 Colors" to start.</p>';
+            `).join('') || '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">No inventory. Click "Add MARD 221 Colors" to start.</p>';
         }
 
         function filterInventory() {
@@ -1545,6 +1546,24 @@
             renderInventory();
             renderDashboard();
             showToast(`Added ${added} MARD colors (221 total)`);
+        }
+
+        // Reset to MARD colors (clears all inventory first)
+        function resetToMardColors() {
+            if (!confirm('This will DELETE all current inventory and reset to MARD 221 colors. Continue?')) {
+                return;
+            }
+            if (!confirm('Are you SURE? All your current bead counts will be lost!')) {
+                return;
+            }
+
+            // Clear inventory
+            data.inventory = [];
+            saveData();
+
+            // Re-initialize with MARD colors
+            initDefaultColors();
+            showToast('Reset to MARD 221 colors complete!');
         }
 
         // Bulk Update
