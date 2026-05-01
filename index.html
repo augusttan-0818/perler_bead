@@ -1073,16 +1073,22 @@
 
         // Firebase Setup
         function checkFirebaseConfig() {
-            const config = localStorage.getItem('firebaseConfig');
+            // Hardcoded config - no setup needed!
+            const hardcodedConfig = {
+                apiKey: "AIzaSyC8OQ077Ax3EXiNg10kqQLawdJjWDQzRfI",
+                authDomain: "perler-beads-c656b.firebaseapp.com",
+                databaseURL: "https://perler-beads-c656b-default-rtdb.firebaseio.com",
+                projectId: "perler-beads-c656b",
+                storageBucket: "perler-beads-c656b.firebasestorage.app"
+            };
+
             const offlineMode = localStorage.getItem('offlineMode');
 
             if (offlineMode === 'true') {
                 isOfflineMode = true;
                 startOfflineMode();
-            } else if (config) {
-                initFirebase(JSON.parse(config));
             } else {
-                showSetupScreen();
+                initFirebase(hardcodedConfig);
             }
         }
 
