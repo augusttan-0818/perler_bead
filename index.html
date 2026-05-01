@@ -361,6 +361,21 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="add-beads-modal">
+        <div class="modal">
+            <h2>Add Beads to Project</h2>
+            <p id="add-beads-project-name" style="color:var(--text-muted);margin-bottom:15px;"></p>
+            <div class="form-group">
+                <label>Beads Used (auto-deducts from inventory)</label>
+                <textarea id="add-beads-input" placeholder="A1:50, B5:100, C3:25" rows="4"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:20px;">
+                <button class="btn-primary" onclick="addBeadsToProject()">Add & Deduct</button>
+                <button class="btn-secondary" onclick="closeModal('add-beads-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast">Success!</div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -551,6 +566,10 @@
                 const folder = data.folders.find(f => f.id === p.folderId);
                 const tags = (p.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
                 const person = p.person === 'person1' ? data.settings.person1Name : p.person === 'person2' ? data.settings.person2Name : 'Both';
+                const beadsList = Object.entries(p.beadsUsed || {}).map(([code,qty]) => {
+                    const c = data.inventory.find(x => x.name === code);
+                    return `<span class="plan-bead-tag" style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;background:${c?.color||'#888'};border-radius:50%;"></span>${code}:${qty}</span>`;
+                }).join('');
                 return `
                 <div class="project-card ${p.favorite ? 'favorited' : ''}">
                     ${p.image ? `<img src="${p.image}" class="project-image">` : ''}
@@ -569,8 +588,12 @@
                             ${folder ? `<span class="tag folder-tag">📁${folder.name}</span>` : ''}
                             ${tags}
                         </div>
+                        ${beadsList ? `<div style="margin:10px 0;"><b style="font-size:0.8rem;">Beads:</b><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">${beadsList}</div></div>` : ''}
                         ${p.notes ? `<p style="color:var(--text-muted);font-size:0.85rem;">${p.notes}</p>` : ''}
-                        <button class="btn-sm btn-danger" onclick="deleteProject('${p.id}')" style="margin-top:10px;">Delete</button>
+                        <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap;">
+                            <button class="btn-sm btn-primary" onclick="openAddBeadsModal('${p.id}')">+ Add Beads</button>
+                            <button class="btn-sm btn-danger" onclick="deleteProject('${p.id}')">Delete</button>
+                        </div>
                     </div>
                 </div>`;
             }).join('') || '<p style="text-align:center;color:var(--text-muted);grid-column:1/-1;">No projects</p>';
@@ -622,6 +645,47 @@
         function deleteProject(id) { if(confirm('Delete?')) { data.projects = data.projects.filter(p => p.id !== id); saveData(); renderProjects(); renderDashboard(); showToast('Deleted'); } }
         function toggleFavorite(id) { const p = data.projects.find(x => x.id === id); if(p) { p.favorite = !p.favorite; saveData(); renderProjects(); } }
         function toggleFavoritesOnly() { showFavoritesOnly = !showFavoritesOnly; renderProjects(); }
+
+        let currentBeadsProjectId = null;
+        function openAddBeadsModal(id) {
+            const p = data.projects.find(x => x.id === id);
+            if(!p) return;
+            currentBeadsProjectId = id;
+            document.getElementById('add-beads-project-name').textContent = `Project: ${p.name}`;
+            document.getElementById('add-beads-input').value = '';
+            openModal('add-beads-modal');
+        }
+        function addBeadsToProject() {
+            if(!currentBeadsProjectId) return;
+            const p = data.projects.find(x => x.id === currentBeadsProjectId);
+            if(!p) return;
+            const input = document.getElementById('add-beads-input').value.trim();
+            if(!input) return alert('Enter beads');
+
+            if(!p.beadsUsed) p.beadsUsed = {};
+            if(!p.totalBeads) p.totalBeads = 0;
+            let added = 0;
+
+            input.split(/[,\n]+/).map(s=>s.trim()).filter(s=>s).forEach(entry => {
+                const m = entry.match(/^([A-HMa-hm]\d{1,2}):(\d+)$/i);
+                if(m) {
+                    const code = m[1].toUpperCase(), amt = parseInt(m[2]);
+                    p.beadsUsed[code] = (p.beadsUsed[code]||0) + amt;
+                    p.totalBeads += amt;
+                    added += amt;
+                    const c = data.inventory.find(x => x.name === code);
+                    if(c) {
+                        c.quantity = Math.max(0, c.quantity - amt);
+                        data.usageLog.push({id:Date.now().toString()+Math.random(), colorId:c.id, amount:amt, date:new Date().toISOString()});
+                    }
+                }
+            });
+
+            saveData(); renderProjects(); renderDashboard(); renderInventory();
+            closeModal('add-beads-modal');
+            showToast(`Added ${added} beads`);
+            currentBeadsProjectId = null;
+        }
 
         // Planning
         function previewPlanImage(e) {
