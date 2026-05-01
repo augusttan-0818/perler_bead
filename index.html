@@ -213,6 +213,7 @@
                     <div class="form-group"><label>Date</label><input type="date" id="project-date"></div>
                     <div class="form-group"><label>Photo</label><input type="file" id="project-image" accept="image/*"></div>
                     <div class="form-group"><label>Tags (comma sep)</label><input type="text" id="project-tags" placeholder="gift, large, pokemon"></div>
+                    <div class="form-group" style="grid-column: 1 / -1;"><label>Beads Used (auto-deducts)</label><textarea id="project-beads" placeholder="A1:50, B5:100, C3:25" rows="2"></textarea></div>
                     <div class="form-group" style="grid-column: 1 / -1;"><label>Notes</label><textarea id="project-notes" placeholder="Notes..."></textarea></div>
                 </div>
                 <button class="btn-primary" onclick="addProject()">Save Project</button>
@@ -562,6 +563,7 @@
                         <div class="project-meta">
                             <span>${formatDate(p.date)}</span>
                             <span>${p.time ? formatTime(p.time) : ''}</span>
+                            ${p.totalBeads ? `<span>🔢${p.totalBeads} beads</span>` : ''}
                         </div>
                         <div class="project-tags">
                             ${folder ? `<span class="tag folder-tag">📁${folder.name}</span>` : ''}
@@ -580,14 +582,36 @@
             let imageData = null;
             const addProj = (img) => {
                 const tags = document.getElementById('project-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
+                const beadsInput = document.getElementById('project-beads').value.trim();
+                const beadsUsed = {};
+                let totalBeads = 0;
+
+                // Process beads and deduct from inventory
+                if(beadsInput) {
+                    beadsInput.split(/[,\n]+/).map(s=>s.trim()).filter(s=>s).forEach(entry => {
+                        const m = entry.match(/^([A-HMa-hm]\d{1,2}):(\d+)$/i);
+                        if(m) {
+                            const code = m[1].toUpperCase(), amt = parseInt(m[2]);
+                            beadsUsed[code] = (beadsUsed[code]||0) + amt;
+                            totalBeads += amt;
+                            const c = data.inventory.find(x => x.name === code);
+                            if(c) {
+                                c.quantity = Math.max(0, c.quantity - amt);
+                                data.usageLog.push({id:Date.now().toString()+Math.random(), colorId:c.id, amount:amt, date:new Date().toISOString()});
+                            }
+                        }
+                    });
+                }
+
                 data.projects.push({
                     id: Date.now().toString(), name, folderId: document.getElementById('project-folder').value,
                     person: document.getElementById('project-person').value, time: parseInt(document.getElementById('project-time').value)||0,
                     date: document.getElementById('project-date').value,
-                    notes: document.getElementById('project-notes').value, tags, image: img, favorite: false
+                    notes: document.getElementById('project-notes').value, tags, image: img, favorite: false,
+                    beadsUsed, totalBeads
                 });
-                saveData(); renderProjects(); renderDashboard(); showToast('Saved');
-                ['project-name','project-time','project-notes','project-tags'].forEach(id => document.getElementById(id).value = '');
+                saveData(); renderProjects(); renderDashboard(); renderInventory(); showToast('Saved' + (totalBeads ? ` (${totalBeads} beads deducted)` : ''));
+                ['project-name','project-time','project-notes','project-tags','project-beads'].forEach(id => document.getElementById(id).value = '');
             };
             if(imageInput.files[0]) {
                 const reader = new FileReader();
