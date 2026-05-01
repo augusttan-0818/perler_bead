@@ -79,6 +79,8 @@
         .modal { background: var(--bg-card); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
         .toast { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 15px 25px; border-radius: 10px; transform: translateX(200%); transition: transform 0.3s ease; z-index: 1001; }
         .toast.show { transform: translateX(0); }
+        .timer-display { font-size: 3rem; font-family: monospace; text-align: center; padding: 20px; background: var(--bg-input); border-radius: 15px; margin: 20px 0; }
+        .timer-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
         .shopping-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid var(--border); }
         .shopping-item.needed { background: rgba(239, 68, 68, 0.1); }
         .color-preview { display: flex; flex-wrap: wrap; gap: 5px; padding: 15px; background: var(--bg-input); border-radius: 10px; margin: 15px 0; min-height: 60px; }
@@ -128,6 +130,7 @@
             <button class="tab-btn" onclick="showTab('bulk-update')">Bulk Update</button>
             <button class="tab-btn" onclick="showTab('projects')">Projects</button>
             <button class="tab-btn" onclick="showTab('planning')">Planning</button>
+            <button class="tab-btn" onclick="showTab('timer')">Timer</button>
             <button class="tab-btn" onclick="showTab('shopping')">Shopping</button>
             <button class="tab-btn" onclick="showTab('notes')">Notes</button>
             <button class="tab-btn" onclick="showTab('stats')">Stats</button>
@@ -140,6 +143,7 @@
                 <div class="stat-card"><div class="icon">🎨</div><div class="value" id="total-colors">0</div><div class="label">Colors</div></div>
                 <div class="stat-card"><div class="icon">🔢</div><div class="value" id="total-beads">0</div><div class="label">Total Beads</div></div>
                 <div class="stat-card"><div class="icon">🎯</div><div class="value" id="total-projects">0</div><div class="label">Projects</div></div>
+                <div class="stat-card"><div class="icon">⏱️</div><div class="value" id="total-time">0h</div><div class="label">Time Spent</div></div>
                 <div class="stat-card"><div class="icon">📁</div><div class="value" id="total-folders">0</div><div class="label">Folders</div></div>
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
@@ -205,6 +209,7 @@
                     <div class="form-group"><label>Made By</label>
                         <select id="project-person"><option value="person1">Person 1</option><option value="person2">Person 2</option><option value="both">Both</option></select>
                     </div>
+                    <div class="form-group"><label>Time (min)</label><input type="number" id="project-time" placeholder="60"></div>
                     <div class="form-group"><label>Date</label><input type="date" id="project-date"></div>
                     <div class="form-group"><label>Photo</label><input type="file" id="project-image" accept="image/*"></div>
                     <div class="form-group"><label>Tags (comma sep)</label><input type="text" id="project-tags" placeholder="gift, large, pokemon"></div>
@@ -259,6 +264,24 @@
                 <h2>Comparison</h2>
                 <div id="comparison-summary"></div>
                 <div class="comparison-grid" id="comparison-grid"></div>
+            </div>
+        </div>
+
+        <!-- Timer -->
+        <div id="timer" class="tab-content">
+            <div class="card">
+                <h2>⏱️ Project Timer</h2>
+                <div class="timer-display" id="timer-display">00:00:00</div>
+                <div class="timer-controls">
+                    <button class="btn-success" onclick="startTimer()">▶ Start</button>
+                    <button class="btn-warning" onclick="pauseTimer()">⏸ Pause</button>
+                    <button class="btn-danger" onclick="resetTimer()">⏹ Reset</button>
+                    <button class="btn-primary" onclick="saveTimerToProject()">💾 Save to Project</button>
+                </div>
+                <div class="form-group" style="margin-top:20px;">
+                    <label>Save to Project:</label>
+                    <select id="timer-project"></select>
+                </div>
             </div>
         </div>
 
@@ -349,6 +372,7 @@
             lastUsage: null
         };
         let currentSort = 'name', database = null, showFavoritesOnly = false;
+        let timerInterval = null, timerSeconds = 0, timerRunning = false;
 
         document.addEventListener('DOMContentLoaded', () => initFirebase());
 
@@ -386,6 +410,7 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             event.target.classList.add('active');
+            if(id === 'timer') populateTimerProjects();
             if(id === 'stats') renderStats();
         }
         function openModal(id) { document.getElementById(id).classList.add('active'); }
@@ -402,6 +427,8 @@
             document.getElementById('total-beads').textContent = data.inventory.reduce((s,c) => s+c.quantity, 0).toLocaleString();
             document.getElementById('total-projects').textContent = data.projects.length;
             document.getElementById('total-folders').textContent = data.folders.length;
+            const mins = data.projects.reduce((s,p) => s+(p.time||0), 0);
+            document.getElementById('total-time').textContent = Math.floor(mins/60) + 'h ' + (mins%60) + 'm';
 
             const low = data.inventory.filter(c => c.quantity < 200).sort((a,b) => a.quantity - b.quantity);
             document.getElementById('low-stock-list').innerHTML = low.length ? low.slice(0,10).map(c =>
@@ -534,6 +561,7 @@
                     <div class="project-body">
                         <div class="project-meta">
                             <span>${formatDate(p.date)}</span>
+                            <span>${p.time ? formatTime(p.time) : ''}</span>
                         </div>
                         <div class="project-tags">
                             ${folder ? `<span class="tag folder-tag">📁${folder.name}</span>` : ''}
@@ -554,12 +582,12 @@
                 const tags = document.getElementById('project-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
                 data.projects.push({
                     id: Date.now().toString(), name, folderId: document.getElementById('project-folder').value,
-                    person: document.getElementById('project-person').value,
+                    person: document.getElementById('project-person').value, time: parseInt(document.getElementById('project-time').value)||0,
                     date: document.getElementById('project-date').value,
                     notes: document.getElementById('project-notes').value, tags, image: img, favorite: false
                 });
                 saveData(); renderProjects(); renderDashboard(); showToast('Saved');
-                ['project-name','project-notes','project-tags'].forEach(id => document.getElementById(id).value = '');
+                ['project-name','project-time','project-notes','project-tags'].forEach(id => document.getElementById(id).value = '');
             };
             if(imageInput.files[0]) {
                 const reader = new FileReader();
@@ -642,6 +670,24 @@
             data.projects.push({id:Date.now().toString(), name:plan.name, person:'both', time:0, date:new Date().toISOString().split('T')[0], notes:`From plan. Beads: ${Object.values(plan.beads||{}).reduce((a,b)=>a+b,0)}`, favorite:false});
             data.plans = data.plans.filter(p => p.id !== id);
             saveData(); renderAll(); showToast('Completed!');
+        }
+
+        // Timer
+        function updateTimerDisplay() {
+            const h = Math.floor(timerSeconds/3600), m = Math.floor((timerSeconds%3600)/60), s = timerSeconds%60;
+            document.getElementById('timer-display').textContent = [h,m,s].map(v => String(v).padStart(2,'0')).join(':');
+        }
+        function startTimer() { if(!timerRunning) { timerRunning = true; timerInterval = setInterval(() => { timerSeconds++; updateTimerDisplay(); }, 1000); } }
+        function pauseTimer() { timerRunning = false; clearInterval(timerInterval); }
+        function resetTimer() { pauseTimer(); timerSeconds = 0; updateTimerDisplay(); }
+        function populateTimerProjects() {
+            document.getElementById('timer-project').innerHTML = '<option value="">Select project</option>' + data.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        }
+        function saveTimerToProject() {
+            const id = document.getElementById('timer-project').value;
+            if(!id) return alert('Select project');
+            const p = data.projects.find(x => x.id === id);
+            if(p) { p.time = (p.time||0) + Math.floor(timerSeconds/60); saveData(); renderProjects(); renderDashboard(); resetTimer(); showToast('Time saved!'); }
         }
 
         // Shopping
@@ -730,6 +776,7 @@
 
         // Utils
         function formatDate(d) { if(!d) return '-'; const dt = new Date(d); return `${dt.getMonth()+1}/${dt.getDate()}/${dt.getFullYear()}`; }
+        function formatTime(m) { return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`; }
     </script>
 </body>
 </html>
