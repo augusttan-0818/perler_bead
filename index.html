@@ -249,12 +249,12 @@
         <div id="planning" class="tab-content">
             <div class="card">
                 <h2>Create Plan</h2>
-                <div class="form-grid">
+                <div class="form-grid" style="margin-bottom:25px;">
                     <div class="form-group"><label>Name</label><input type="text" id="plan-name" placeholder="Mario Collection"></div>
                     <div class="form-group"><label>Image</label><input type="file" id="plan-image" accept="image/*" onchange="previewPlanImage(event)"></div>
                 </div>
                 <div id="plan-image-preview" style="margin:15px 0;"></div>
-                <div class="form-group" style="margin-bottom:20px;"><label>Beads Needed</label><textarea id="plan-beads" placeholder="A1:50, B5:100" rows="3"></textarea></div>
+                <div class="form-group" style="margin-top:25px; margin-bottom:20px;"><label>Beads Needed</label><textarea id="plan-beads" placeholder="A1:50, B5:100" rows="3"></textarea></div>
                 <button class="btn-primary" onclick="createPlan()">Create Plan</button>
             </div>
             <div class="card">
