@@ -376,6 +376,31 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="edit-project-modal">
+        <div class="modal">
+            <h2>Edit Project</h2>
+            <input type="hidden" id="edit-project-id">
+            <div class="form-grid">
+                <div class="form-group"><label>Name</label><input type="text" id="edit-project-name"></div>
+                <div class="form-group"><label>Folder</label>
+                    <select id="edit-project-folder"><option value="">No Folder</option></select>
+                </div>
+                <div class="form-group"><label>Made By</label>
+                    <select id="edit-project-person"><option value="person1">Augy</option><option value="person2">Angelala</option><option value="both">Both</option></select>
+                </div>
+                <div class="form-group"><label>Time (min)</label><input type="number" id="edit-project-time"></div>
+                <div class="form-group"><label>Date</label><input type="date" id="edit-project-date"></div>
+                <div class="form-group"><label>New Photo</label><input type="file" id="edit-project-image" accept="image/*"></div>
+                <div class="form-group" style="grid-column:1/-1;"><label>Tags (comma sep)</label><input type="text" id="edit-project-tags"></div>
+                <div class="form-group" style="grid-column:1/-1;"><label>Notes</label><textarea id="edit-project-notes" rows="3"></textarea></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:20px;">
+                <button class="btn-primary" onclick="saveEditProject()">Save</button>
+                <button class="btn-secondary" onclick="closeModal('edit-project-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast">Success!</div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -591,6 +616,7 @@
                         ${beadsList ? `<div style="margin:10px 0;"><b style="font-size:0.8rem;">Beads:</b><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">${beadsList}</div></div>` : ''}
                         ${p.notes ? `<p style="color:var(--text-muted);font-size:0.85rem;">${p.notes}</p>` : ''}
                         <div style="display:flex;gap:5px;margin-top:10px;flex-wrap:wrap;">
+                            <button class="btn-sm btn-secondary" onclick="openEditProject('${p.id}')">✏️ Edit</button>
                             <button class="btn-sm btn-primary" onclick="openAddBeadsModal('${p.id}')">+ Add Beads</button>
                             <button class="btn-sm btn-danger" onclick="deleteProject('${p.id}')">Delete</button>
                         </div>
@@ -685,6 +711,56 @@
             closeModal('add-beads-modal');
             showToast(`Added ${added} beads`);
             currentBeadsProjectId = null;
+        }
+
+        function openEditProject(id) {
+            const p = data.projects.find(x => x.id === id);
+            if(!p) return;
+            document.getElementById('edit-project-id').value = id;
+            document.getElementById('edit-project-name').value = p.name || '';
+            document.getElementById('edit-project-time').value = p.time || '';
+            document.getElementById('edit-project-date').value = p.date || '';
+            document.getElementById('edit-project-person').value = p.person || 'person1';
+            document.getElementById('edit-project-tags').value = (p.tags || []).join(', ');
+            document.getElementById('edit-project-notes').value = p.notes || '';
+            // Populate folder dropdown
+            const folderSel = document.getElementById('edit-project-folder');
+            folderSel.innerHTML = '<option value="">No Folder</option>' + data.folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+            folderSel.value = p.folderId || '';
+            openModal('edit-project-modal');
+        }
+        function saveEditProject() {
+            const id = document.getElementById('edit-project-id').value;
+            const p = data.projects.find(x => x.id === id);
+            if(!p) return;
+
+            const name = document.getElementById('edit-project-name').value.trim();
+            if(!name) return alert('Enter name');
+
+            p.name = name;
+            p.folderId = document.getElementById('edit-project-folder').value;
+            p.person = document.getElementById('edit-project-person').value;
+            p.time = parseInt(document.getElementById('edit-project-time').value) || 0;
+            p.date = document.getElementById('edit-project-date').value;
+            p.tags = document.getElementById('edit-project-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
+            p.notes = document.getElementById('edit-project-notes').value;
+
+            // Handle new image if selected
+            const imageInput = document.getElementById('edit-project-image');
+            if(imageInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    p.image = e.target.result;
+                    saveData(); renderProjects(); renderDashboard();
+                    closeModal('edit-project-modal');
+                    showToast('Project updated');
+                };
+                reader.readAsDataURL(imageInput.files[0]);
+            } else {
+                saveData(); renderProjects(); renderDashboard();
+                closeModal('edit-project-modal');
+                showToast('Project updated');
+            }
         }
 
         // Planning
