@@ -21,28 +21,32 @@
         .sync-status.connected { background: var(--success); }
         .sync-status.offline { background: var(--warning); }
         .tabs { display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; justify-content: center; }
-        .tab-btn { padding: 12px 24px; border: none; background: var(--bg-card); color: var(--text); border-radius: 10px; cursor: pointer; font-size: 1rem; transition: all 0.3s; }
-        .tab-btn:hover { background: var(--bg-input); }
-        .tab-btn.active { background: var(--primary); }
+        .tab-btn { padding: 10px 20px; border: none; background: var(--bg-card); color: var(--text); border-radius: 50px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; font-weight: 500; }
+        .tab-btn:hover { background: var(--bg-input); transform: translateY(-1px); }
+        .tab-btn.active { background: var(--primary); box-shadow: 0 2px 10px rgba(99,102,241,0.3); }
         .tab-content { display: none; }
         .tab-content.active { display: block; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .card { background: var(--bg-card); border-radius: 15px; padding: 25px; margin-bottom: 20px; }
-        .card h2 { margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .card { background: var(--bg-card); border-radius: 20px; padding: 25px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .card h2 { margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-weight: 600; }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .form-group { display: flex; flex-direction: column; gap: 5px; }
         .form-group label { color: var(--text-muted); font-size: 0.9rem; }
-        input, select, textarea { padding: 12px 15px; border: 2px solid var(--border); border-radius: 10px; background: var(--bg-input); color: var(--text); font-size: 1rem; }
-        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        input, select, textarea { padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-input); color: var(--text); font-size: 1rem; transition: all 0.2s; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
         textarea { resize: vertical; min-height: 80px; font-family: monospace; }
-        button { padding: 12px 24px; border: none; border-radius: 10px; cursor: pointer; font-size: 1rem; transition: all 0.3s; }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-primary:hover { background: var(--primary-dark); }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-secondary { background: var(--bg-input); color: var(--text); }
-        .btn-success { background: var(--success); color: white; }
-        .btn-warning { background: var(--warning); color: white; }
-        .btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+        button { padding: 12px 24px; border: none; border-radius: 50px; cursor: pointer; font-size: 1rem; transition: all 0.2s; font-weight: 500; }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(99,102,241,0.3); }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.4); }
+        .btn-danger { background: var(--danger); color: white; box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
+        .btn-danger:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,68,68,0.4); }
+        .btn-secondary { background: var(--bg-input); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--bg-card); border-color: var(--primary); }
+        .btn-success { background: var(--success); color: white; box-shadow: 0 2px 8px rgba(16,185,129,0.3); }
+        .btn-success:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(16,185,129,0.4); }
+        .btn-warning { background: var(--warning); color: white; box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
+        .btn-warning:hover { transform: translateY(-1px); }
+        .btn-sm { padding: 8px 16px; font-size: 0.8rem; border-radius: 50px; }
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .stat-card { background: var(--bg-card); padding: 25px; border-radius: 15px; text-align: center; }
         .stat-card .icon { font-size: 2rem; margin-bottom: 10px; }
@@ -58,8 +62,9 @@
         .low-stock { border: 2px solid var(--warning); }
         .out-of-stock { border: 2px solid var(--danger); }
         .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-        .project-card { background: var(--bg-input); border-radius: 15px; overflow: hidden; }
-        .project-card.favorited { border: 2px solid gold; }
+        .project-card { background: var(--bg-input); border-radius: 20px; overflow: hidden; border: 1px solid var(--border); transition: all 0.2s; }
+        .project-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.2); }
+        .project-card.favorited { border: 2px solid gold; box-shadow: 0 0 20px rgba(255,215,0,0.2); }
         .project-header { background: linear-gradient(135deg, var(--primary), var(--secondary)); padding: 15px; position: relative; }
         .project-header h3 { margin-bottom: 5px; padding-right: 30px; }
         .project-image { width: 100%; max-height: 150px; object-fit: cover; }
@@ -76,7 +81,7 @@
         .person-2 { background: var(--secondary); }
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.active { display: flex; }
-        .modal { background: var(--bg-card); border-radius: 20px; padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal { background: var(--bg-card); border-radius: 24px; padding: 30px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
         .toast { position: fixed; bottom: 20px; right: 20px; background: var(--success); color: white; padding: 15px 25px; border-radius: 10px; transform: translateX(200%); transition: transform 0.3s ease; z-index: 1001; }
         .toast.show { transform: translateX(0); }
         .timer-display { font-size: 3rem; font-family: monospace; text-align: center; padding: 20px; background: var(--bg-input); border-radius: 15px; margin: 20px 0; }
@@ -250,7 +255,7 @@
                 </div>
                 <div id="plan-image-preview" style="margin:15px 0;"></div>
                 <div class="form-group"><label>Beads Needed</label><textarea id="plan-beads" placeholder="A1:50, B5:100" rows="3"></textarea></div>
-                <button class="btn-primary" onclick="createPlan()">Create Plan</button>
+                <button class="btn-primary" onclick="createPlan()" style="margin-top:3px;">Create Plan</button>
             </div>
             <div class="card">
                 <h2>Plans</h2>
@@ -397,6 +402,22 @@
             <div style="display:flex;gap:10px;margin-top:20px;">
                 <button class="btn-primary" onclick="saveEditProject()">Save</button>
                 <button class="btn-secondary" onclick="closeModal('edit-project-modal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="edit-plan-modal">
+        <div class="modal">
+            <h2>Edit Plan</h2>
+            <input type="hidden" id="edit-plan-id">
+            <div class="form-grid">
+                <div class="form-group"><label>Name</label><input type="text" id="edit-plan-name"></div>
+                <div class="form-group"><label>New Image</label><input type="file" id="edit-plan-image" accept="image/*"></div>
+            </div>
+            <div class="form-group" style="margin-top:15px;"><label>Beads Needed</label><textarea id="edit-plan-beads" rows="4"></textarea></div>
+            <div style="display:flex;gap:10px;margin-top:20px;">
+                <button class="btn-primary" onclick="saveEditPlan()">Save</button>
+                <button class="btn-secondary" onclick="closeModal('edit-plan-modal')">Cancel</button>
             </div>
         </div>
     </div>
@@ -794,6 +815,7 @@
                     <h3>${p.name}</h3><p style="color:var(--text-muted);font-size:0.8rem;">Total: ${total}</p>
                     <div class="plan-beads">${tags || 'No beads'}</div>
                     <div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap;">
+                        <button class="btn-sm btn-secondary" onclick="openEditPlan('${p.id}')">✏️ Edit</button>
                         <button class="btn-sm btn-success" onclick="completePlan('${p.id}',true)">✓ Complete</button>
                         <button class="btn-sm btn-primary" onclick="completePlan('${p.id}',false)">✓ No Deduct</button>
                         <button class="btn-sm btn-danger" onclick="deletePlan('${p.id}')">Delete</button>
@@ -822,6 +844,51 @@
             ).join('');
         }
         function deletePlan(id) { if(confirm('Delete?')) { data.plans = data.plans.filter(p => p.id !== id); saveData(); renderPlans(); showToast('Deleted'); } }
+
+        function openEditPlan(id) {
+            const p = data.plans.find(x => x.id === id);
+            if(!p) return;
+            document.getElementById('edit-plan-id').value = id;
+            document.getElementById('edit-plan-name').value = p.name || '';
+            document.getElementById('edit-plan-beads').value = Object.entries(p.beads||{}).map(([c,q]) => `${c}:${q}`).join(', ');
+            openModal('edit-plan-modal');
+        }
+        function saveEditPlan() {
+            const id = document.getElementById('edit-plan-id').value;
+            const p = data.plans.find(x => x.id === id);
+            if(!p) return;
+
+            const name = document.getElementById('edit-plan-name').value.trim();
+            if(!name) return alert('Enter name');
+
+            p.name = name;
+
+            // Parse beads
+            const beads = {};
+            document.getElementById('edit-plan-beads').value.split(/[,\n]+/).map(s=>s.trim()).filter(s=>s).forEach(e => {
+                const m = e.match(/^([A-HMa-hm]\d{1,2}):(\d+)$/i);
+                if(m) beads[m[1].toUpperCase()] = parseInt(m[2]);
+            });
+            p.beads = beads;
+
+            // Handle new image if selected
+            const imageInput = document.getElementById('edit-plan-image');
+            if(imageInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    p.image = e.target.result;
+                    saveData(); renderPlans();
+                    closeModal('edit-plan-modal');
+                    showToast('Plan updated');
+                };
+                reader.readAsDataURL(imageInput.files[0]);
+            } else {
+                saveData(); renderPlans();
+                closeModal('edit-plan-modal');
+                showToast('Plan updated');
+            }
+        }
+
         function completePlan(id, deduct) {
             const plan = data.plans.find(p => p.id === id);
             if(!plan || !confirm(`Complete "${plan.name}"${deduct ? ' and deduct beads' : ''}?`)) return;
