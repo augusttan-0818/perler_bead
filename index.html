@@ -511,11 +511,15 @@
 
             <!-- Planned Inventory Tab -->
             <div id="planned-inventory-tab" style="display:none;">
-                <p style="color:var(--text-muted);margin-bottom:15px;">Shows current inventory + incoming orders = planned total.</p>
+                <p style="color:var(--text-muted);margin-bottom:15px;">Current inventory + incoming = planned total. Green border = has incoming.</p>
 
                 <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;align-items:center;">
-                    <input type="text" id="planned-inv-search" placeholder="Search (A1, B5...)" style="width:150px;" oninput="renderPlannedInventoryTable()">
-                    <span style="color:var(--text-muted);">Filter:</span>
+                    <input type="text" id="planned-inv-search" placeholder="Search..." style="width:120px;" oninput="renderPlannedInventoryGrid()">
+                    <button class="btn-sm btn-secondary" onclick="sortPlannedInvGrid('name')">A-Z</button>
+                    <button class="btn-sm btn-secondary" onclick="sortPlannedInvGrid('asc')">↑ Low</button>
+                    <button class="btn-sm btn-secondary" onclick="sortPlannedInvGrid('desc')">↓ High</button>
+                </div>
+                <div style="display:flex;gap:5px;margin-bottom:15px;flex-wrap:wrap;align-items:center;">
                     <button class="btn-sm btn-secondary planned-filter active" onclick="filterPlannedInv('')">All</button>
                     <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('A')">A</button>
                     <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('B')">B</button>
@@ -528,7 +532,7 @@
                     <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('M')">M</button>
                 </div>
 
-                <div id="planned-inventory-table" style="max-height:350px;overflow-y:auto;"></div>
+                <div id="planned-inventory-grid" class="inventory-grid" style="max-height:350px;overflow-y:auto;"></div>
             </div>
 
             <div style="margin-top:20px;display:flex;gap:10px;">
@@ -1470,7 +1474,7 @@
                 document.getElementById('planned-inventory-tab').style.display = 'block';
                 document.querySelector('.incoming-tab:last-child').classList.add('active', 'btn-primary');
                 document.querySelector('.incoming-tab:last-child').classList.remove('btn-secondary');
-                renderPlannedInventoryTable();
+                renderPlannedInventoryGrid();
             }
         }
 
@@ -1483,11 +1487,17 @@
                     btn.classList.add('active');
                 }
             });
-            renderPlannedInventoryTable();
+            renderPlannedInventoryGrid();
         }
 
-        function renderPlannedInventoryTable() {
-            const container = document.getElementById('planned-inventory-table');
+        let plannedInvSort = 'name';
+        function sortPlannedInvGrid(type) {
+            plannedInvSort = type;
+            renderPlannedInventoryGrid();
+        }
+
+        function renderPlannedInventoryGrid() {
+            const container = document.getElementById('planned-inventory-grid');
             const search = (document.getElementById('planned-inv-search')?.value || '').toUpperCase();
 
             let items = data.inventory.map(c => {
@@ -1511,52 +1521,35 @@
                 items = items.filter(c => c.name.startsWith(plannedInvFilter));
             }
 
-            // Sort by name
-            items.sort((a, b) => {
-                const am = a.name.match(/^([A-Z])(\d+)$/), bm = b.name.match(/^([A-Z])(\d+)$/);
-                if (am && bm) return am[1] === bm[1] ? parseInt(am[2]) - parseInt(bm[2]) : am[1].localeCompare(bm[1]);
-                return a.name.localeCompare(b.name);
-            });
+            // Sort based on mode
+            if (plannedInvSort === 'asc') {
+                items.sort((a, b) => a.planned - b.planned);
+            } else if (plannedInvSort === 'desc') {
+                items.sort((a, b) => b.planned - a.planned);
+            } else {
+                // Sort by name (A1, A2, ... B1, B2, ...)
+                items.sort((a, b) => {
+                    const am = a.name.match(/^([A-Z])(\d+)$/), bm = b.name.match(/^([A-Z])(\d+)$/);
+                    if (am && bm) return am[1] === bm[1] ? parseInt(am[2]) - parseInt(bm[2]) : am[1].localeCompare(bm[1]);
+                    return a.name.localeCompare(b.name);
+                });
+            }
 
-            const totalCurrent = items.reduce((s, c) => s + c.current, 0);
-            const totalIncoming = items.reduce((s, c) => s + c.incoming, 0);
-            const totalPlanned = items.reduce((s, c) => s + c.planned, 0);
-
-            container.innerHTML = `
-                <table style="width:100%;border-collapse:collapse;">
-                    <thead>
-                        <tr style="background:var(--bg-input);text-align:left;position:sticky;top:0;">
-                            <th style="padding:10px;border-bottom:2px solid var(--border);">Color</th>
-                            <th style="padding:10px;border-bottom:2px solid var(--border);text-align:right;">Current</th>
-                            <th style="padding:10px;border-bottom:2px solid var(--border);text-align:right;">Incoming</th>
-                            <th style="padding:10px;border-bottom:2px solid var(--border);text-align:right;">Planned Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${items.map(c => {
-                            const lowStock = c.planned < 200;
-                            const hasIncoming = c.incoming > 0;
-                            return `<tr style="border-bottom:1px solid var(--border);${lowStock ? 'background:rgba(239,68,68,0.1);' : ''}">
-                                <td style="padding:8px;">
-                                    <span style="display:inline-block;width:14px;height:14px;background:${c.color};border-radius:3px;margin-right:8px;vertical-align:middle;"></span>
-                                    <strong>${c.name}</strong>
-                                </td>
-                                <td style="padding:8px;text-align:right;">${c.current.toLocaleString()}</td>
-                                <td style="padding:8px;text-align:right;color:${hasIncoming ? 'var(--success)' : 'var(--text-muted)'};">${hasIncoming ? '+' + c.incoming.toLocaleString() : '-'}</td>
-                                <td style="padding:8px;text-align:right;font-weight:bold;color:${lowStock ? 'var(--danger)' : 'var(--text)'};">${c.planned.toLocaleString()}</td>
-                            </tr>`;
-                        }).join('')}
-                    </tbody>
-                    <tfoot>
-                        <tr style="background:var(--bg-input);font-weight:bold;">
-                            <td style="padding:10px;">Total (${items.length} colors)</td>
-                            <td style="padding:10px;text-align:right;">${totalCurrent.toLocaleString()}</td>
-                            <td style="padding:10px;text-align:right;color:var(--success);">+${totalIncoming.toLocaleString()}</td>
-                            <td style="padding:10px;text-align:right;">${totalPlanned.toLocaleString()}</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            `;
+            // Render as grid like actual inventory
+            container.innerHTML = items.map(c => {
+                const lowStock = c.planned < 200;
+                const outOfStock = c.planned === 0;
+                const hasIncoming = c.incoming > 0;
+                return `
+                    <div class="bead-item ${outOfStock ? 'out-of-stock' : lowStock ? 'low-stock' : ''}" style="${hasIncoming ? 'border:2px solid var(--success);' : ''}">
+                        <div class="bead-color" style="background:${c.color}"></div>
+                        <div class="bead-name">${c.name}</div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">${c.current}</div>
+                        ${hasIncoming ? `<div style="font-size:0.7rem;color:var(--success);">+${c.incoming}</div>` : ''}
+                        <div style="font-size:1rem;font-weight:bold;color:${lowStock ? 'var(--danger)' : 'var(--text)'};">= ${c.planned}</div>
+                    </div>
+                `;
+            }).join('') || '<p style="grid-column:1/-1;text-align:center;color:var(--text-muted);">No colors found</p>';
         }
 
         function selectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = true); }
@@ -1984,7 +1977,7 @@
                 showToast(`✅ Removed ${total} images!`);
             } catch(err) {
                 showToast('❌ Failed to save');
-            });
+            }
         }
 
         function compressExistingImage(base64) {
