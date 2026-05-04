@@ -1024,7 +1024,7 @@
             grid.innerHTML = sorted.map(([code, qty]) => {
                 const inv = data.inventory.find(x => x.name === code);
                 return `<div class="bead-item" style="border:2px solid var(--success);position:relative;">
-                    <button onclick="removeIncoming('${code}')" style="position:absolute;top:2px;right:2px;background:var(--danger);border:none;color:white;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;">×</button>
+                    <button onclick="removeIncoming('${code}')" style="position:absolute;top:5px;right:5px;background:var(--danger);border:none;color:white;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:14px;line-height:20px;text-align:center;padding:0;">×</button>
                     <div class="bead-color" style="background:${inv?.color||'#888'}"></div>
                     <div class="bead-name">${code}</div>
                     <input type="number" class="bead-qty-input" value="${qty}" onchange="updateIncomingQty('${code}',this.value)" style="color:var(--success);">
