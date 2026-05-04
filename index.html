@@ -768,11 +768,43 @@
                 </div>`;
             }).join('') || '<p style="text-align:center;color:var(--text-muted);grid-column:1/-1;">No projects</p>';
         }
+        // Compress image to reduce size for Firebase storage
+        function compressImage(file, maxWidth = 600, quality = 0.7) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        // Scale down if larger than maxWidth
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Convert to JPEG with compression
+                        const compressed = canvas.toDataURL('image/jpeg', quality);
+                        console.log(`Image compressed: ${(file.size/1024).toFixed(1)}KB → ${(compressed.length/1024).toFixed(1)}KB`);
+                        resolve(compressed);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
         function addProject() {
             const name = document.getElementById('project-name').value.trim();
             if(!name) return alert('Enter name');
             const imageInput = document.getElementById('project-image');
-            let imageData = null;
             const addProj = (img) => {
                 const tags = document.getElementById('project-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
                 const beadsInput = document.getElementById('project-beads').value.trim();
@@ -805,11 +837,11 @@
                 });
                 saveData(); renderProjects(); renderDashboard(); renderInventory(); showToast('Saved' + (totalBeads ? ` (${totalBeads} beads deducted)` : ''));
                 ['project-name','project-time','project-notes','project-tags','project-beads'].forEach(id => document.getElementById(id).value = '');
+                imageInput.value = '';
             };
             if(imageInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => addProj(e.target.result);
-                reader.readAsDataURL(imageInput.files[0]);
+                // Compress image before saving
+                compressImage(imageInput.files[0]).then(compressed => addProj(compressed));
             } else addProj(null);
         }
         function deleteProject(id) { if(confirm('Delete?')) { data.projects = data.projects.filter(p => p.id !== id); saveData(); renderProjects(); renderDashboard(); showToast('Deleted'); } }
@@ -889,17 +921,15 @@
             p.tags = document.getElementById('edit-project-tags').value.split(',').map(t=>t.trim()).filter(t=>t);
             p.notes = document.getElementById('edit-project-notes').value;
 
-            // Handle new image if selected
+            // Handle new image if selected (with compression)
             const imageInput = document.getElementById('edit-project-image');
             if(imageInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    p.image = e.target.result;
+                compressImage(imageInput.files[0]).then(compressed => {
+                    p.image = compressed;
                     saveData(); renderProjects(); renderDashboard();
                     closeModal('edit-project-modal');
                     showToast('Project updated');
-                };
-                reader.readAsDataURL(imageInput.files[0]);
+                });
             } else {
                 saveData(); renderProjects(); renderDashboard();
                 closeModal('edit-project-modal');
@@ -910,8 +940,12 @@
         // Planning
         function previewPlanImage(e) {
             const file = e.target.files[0], preview = document.getElementById('plan-image-preview');
-            if(file) { const r = new FileReader(); r.onload = ev => preview.innerHTML = `<img src="${ev.target.result}" style="max-width:200px;border-radius:10px;">`; r.readAsDataURL(file); }
-            else preview.innerHTML = '';
+            if(file) {
+                // Compress image for preview and storage
+                compressImage(file).then(compressed => {
+                    preview.innerHTML = `<img src="${compressed}" style="max-width:200px;border-radius:10px;" data-compressed="true">`;
+                });
+            } else preview.innerHTML = '';
         }
         function createPlan() {
             const name = document.getElementById('plan-name').value.trim();
@@ -1219,17 +1253,15 @@
             });
             p.beads = beads;
 
-            // Handle new image if selected
+            // Handle new image if selected (with compression)
             const imageInput = document.getElementById('edit-plan-image');
             if(imageInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    p.image = e.target.result;
+                compressImage(imageInput.files[0]).then(compressed => {
+                    p.image = compressed;
                     saveData(); renderPlans();
                     closeModal('edit-plan-modal');
                     showToast('Plan updated');
-                };
-                reader.readAsDataURL(imageInput.files[0]);
+                });
             } else {
                 saveData(); renderPlans();
                 closeModal('edit-plan-modal');
