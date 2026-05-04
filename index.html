@@ -1001,8 +1001,8 @@
                 </div>`;
             }).join('') || '<p style="text-align:center;color:var(--text-muted);grid-column:1/-1;">No projects</p>';
         }
-        // Compress image to reduce size for Firebase storage
-        function compressImage(file, maxWidth = 400, quality = 0.5) {
+        // Compress image to reduce size for Firebase storage (light compression)
+        function compressImage(file, maxWidth = 1000, quality = 0.85) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -2034,7 +2034,7 @@
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const maxWidth = 400;
+                    const maxWidth = 1000;
                     let width = img.width;
                     let height = img.height;
 
@@ -2047,7 +2047,7 @@
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.5));
+                    resolve(canvas.toDataURL('image/jpeg', 0.85));
                 };
                 img.onerror = () => resolve(base64); // Keep original if error
                 img.src = base64;
