@@ -258,10 +258,26 @@
                 <button class="btn-primary" onclick="createPlan()">Create Plan</button>
             </div>
             <div class="card">
+                <h2>📦 Incoming Orders (Planned Inventory)</h2>
+                <p style="color:var(--text-muted);margin-bottom:15px;">Add beads you've ordered but haven't arrived yet</p>
+                <div class="form-group"><textarea id="planned-inventory-input" placeholder="A1:500, B5:1000, C3:200" rows="2"></textarea></div>
+                <div style="display:flex;gap:10px;margin-top:10px;">
+                    <button class="btn-success" onclick="savePlannedInventory()">Save Incoming</button>
+                    <button class="btn-secondary" onclick="clearPlannedInventory()">Clear</button>
+                </div>
+                <div id="planned-inventory-display" style="margin-top:15px;"></div>
+            </div>
+            <div class="card">
                 <h2>Plans</h2>
+                <div style="margin-bottom:15px;display:flex;gap:10px;align-items:center;">
+                    <span style="color:var(--text-muted);">Sort beads:</span>
+                    <button class="btn-sm btn-secondary" onclick="setPlanSort('qty')">By Quantity</button>
+                    <button class="btn-sm btn-secondary" onclick="setPlanSort('color')">By Color (A-M)</button>
+                </div>
                 <div id="plans-list"></div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
-                    <button class="btn-primary" onclick="calculateSelectedPlans()">Calculate Selected</button>
+                    <button class="btn-primary" onclick="calculateSelectedPlans()">Check with Actual Inventory</button>
+                    <button class="btn-success" onclick="calculateWithPlanned()">Check with Planned Inventory</button>
                     <button class="btn-secondary" onclick="selectAllPlans()">Select All</button>
                     <button class="btn-secondary" onclick="deselectAllPlans()">Deselect All</button>
                 </div>
@@ -431,9 +447,11 @@
         let data = {
             inventory: [], projects: [], usageLog: [], plans: [], folders: [], notes: [],
             settings: { person1Name: 'Augy', person2Name: 'Angelala' },
-            lastUsage: null
+            lastUsage: null,
+            plannedInventory: {}  // Incoming orders: {A1: 500, B5: 1000}
         };
         let currentSort = 'name', database = null, showFavoritesOnly = false;
+        let planBeadSort = 'qty';  // 'qty' or 'color'
         let timerInterval = null, timerSeconds = 0, timerRunning = false;
 
         document.addEventListener('DOMContentLoaded', () => initFirebase());
@@ -481,6 +499,7 @@
                         data.notes = ensureArray(firebaseData.notes);
                         data.settings = firebaseData.settings || {person1Name:'Augy',person2Name:'Angelala'};
                         data.lastUsage = firebaseData.lastUsage || null;
+                        data.plannedInventory = firebaseData.plannedInventory || {};
                     }
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('main-app').style.display = 'block';
@@ -829,9 +848,25 @@
             document.getElementById('plan-image').value = '';
             document.getElementById('plan-image-preview').innerHTML = '';
         }
+        function sortBeadEntries(entries) {
+            if (planBeadSort === 'color') {
+                return entries.sort((a, b) => {
+                    const am = a[0].match(/^([A-Z])(\d+)$/), bm = b[0].match(/^([A-Z])(\d+)$/);
+                    if (am && bm) return am[1] === bm[1] ? parseInt(am[2]) - parseInt(bm[2]) : am[1].localeCompare(bm[1]);
+                    return a[0].localeCompare(b[0]);
+                });
+            }
+            return entries.sort((a, b) => b[1] - a[1]); // by quantity desc
+        }
+        function setPlanSort(type) { planBeadSort = type; renderPlans(); showToast('Sorted by ' + (type === 'color' ? 'color' : 'quantity')); }
+
         function renderPlans() {
+            // Render planned inventory display
+            renderPlannedInventory();
+
             document.getElementById('plans-list').innerHTML = data.plans.map(p => {
-                const tags = Object.entries(p.beads||{}).map(([c,q]) => `<span class="plan-bead-tag">${c}:${q}</span>`).join('');
+                const sortedBeads = sortBeadEntries(Object.entries(p.beads||{}));
+                const tags = sortedBeads.map(([c,q]) => `<span class="plan-bead-tag">${c}:${q}</span>`).join('');
                 const total = Object.values(p.beads||{}).reduce((a,b)=>a+b,0);
                 return `<div class="plan-card" id="plan-${p.id}">
                     <input type="checkbox" class="plan-checkbox" data-plan-id="${p.id}">
@@ -847,26 +882,115 @@
                 </div>`;
             }).join('') || '<p style="color:var(--text-muted);text-align:center;">No plans</p>';
         }
+
+        // Planned Inventory Functions
+        function savePlannedInventory() {
+            const input = document.getElementById('planned-inventory-input').value.trim();
+            if (!input) return alert('Enter incoming beads');
+            const incoming = {};
+            input.split(/[,\n]+/).map(s=>s.trim()).filter(s=>s).forEach(e => {
+                const m = e.match(/^([A-HMa-hm]\d{1,2}):(\d+)$/i);
+                if (m) incoming[m[1].toUpperCase()] = parseInt(m[2]);
+            });
+            data.plannedInventory = incoming;
+            saveData();
+            renderPlannedInventory();
+            showToast('Incoming orders saved');
+        }
+        function clearPlannedInventory() {
+            if (confirm('Clear all incoming orders?')) {
+                data.plannedInventory = {};
+                document.getElementById('planned-inventory-input').value = '';
+                saveData();
+                renderPlannedInventory();
+                showToast('Cleared');
+            }
+        }
+        function renderPlannedInventory() {
+            const display = document.getElementById('planned-inventory-display');
+            const entries = Object.entries(data.plannedInventory || {});
+            if (entries.length === 0) {
+                display.innerHTML = '<p style="color:var(--text-muted);">No incoming orders</p>';
+                return;
+            }
+            const sorted = sortBeadEntries(entries);
+            display.innerHTML = `<p style="color:var(--success);margin-bottom:10px;">📦 Incoming: ${entries.length} colors</p>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;">${sorted.map(([c,q]) => {
+                    const inv = data.inventory.find(x => x.name === c);
+                    return `<span class="plan-bead-tag" style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;background:${inv?.color||'#888'};border-radius:50%;"></span>${c}:+${q}</span>`;
+                }).join('')}</div>`;
+            // Also populate the input field
+            document.getElementById('planned-inventory-input').value = entries.map(([c,q]) => `${c}:${q}`).join(', ');
+        }
+
         function selectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = true); }
         function deselectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = false); }
+
         function calculateSelectedPlans() {
+            calculateComparison(false); // actual inventory only
+        }
+        function calculateWithPlanned() {
+            calculateComparison(true); // include planned inventory
+        }
+        function calculateComparison(includePlanned) {
             const ids = [...document.querySelectorAll('.plan-checkbox:checked')].map(c => c.dataset.planId);
             if(!ids.length) return alert('Select plans');
             const plans = data.plans.filter(p => ids.includes(p.id)), combined = {};
             plans.forEach(p => Object.entries(p.beads||{}).forEach(([c,q]) => combined[c] = (combined[c]||0) + q));
+
             const comparison = Object.entries(combined).sort((a,b)=>a[0].localeCompare(b[0])).map(([code,needed]) => {
-                const inv = data.inventory.find(c => c.name === code), have = inv?.quantity || 0;
-                return {code, needed, have, diff: have - needed, shortage: have < needed};
+                const inv = data.inventory.find(c => c.name === code);
+                const haveActual = inv?.quantity || 0;
+                const incoming = data.plannedInventory?.[code] || 0;
+                const havePlanned = haveActual + incoming;
+                const haveUsed = includePlanned ? havePlanned : haveActual;
+                return {
+                    code, needed,
+                    haveActual, incoming, havePlanned,
+                    diff: haveUsed - needed,
+                    shortage: haveUsed < needed,
+                    canStartNow: haveActual >= needed,
+                    canStartAfterDelivery: havePlanned >= needed
+                };
             });
+
             const panel = document.getElementById('comparison-results');
             panel.style.display = 'block';
             const total = Object.values(combined).reduce((a,b)=>a+b,0);
             const short = comparison.filter(c => c.shortage);
-            document.getElementById('comparison-summary').innerHTML = `<p>Plans: ${plans.map(p=>p.name).join(', ')}</p><p>Total: ${total}</p><p style="color:${short.length?'var(--danger)':'var(--success)'}">Shortage: ${short.length ? short.length + ' colors' : 'None!'}</p>`;
-            document.getElementById('comparison-grid').innerHTML = comparison.map(c =>
-                `<div class="comparison-item ${c.shortage?'shortage':'sufficient'}"><b>${c.code}</b><br>Need:${c.needed}<br>Have:${c.have}<br><span style="color:${c.shortage?'var(--danger)':'var(--success)'}">${c.shortage?'Short:'+Math.abs(c.diff):'+'+c.diff}</span></div>`
-            ).join('');
+            const canStartNow = comparison.every(c => c.canStartNow);
+            const canStartAfterDelivery = comparison.every(c => c.canStartAfterDelivery);
+
+            let statusMsg = '';
+            if (canStartNow) {
+                statusMsg = '<p style="color:var(--success);font-size:1.1rem;">✅ Can start NOW! You have all beads.</p>';
+            } else if (canStartAfterDelivery) {
+                statusMsg = '<p style="color:var(--warning);font-size:1.1rem;">📦 Wait for delivery - you\'ll have enough after orders arrive</p>';
+            } else {
+                statusMsg = `<p style="color:var(--danger);font-size:1.1rem;">🛒 Need to buy more - short on ${short.length} colors</p>`;
+            }
+
+            document.getElementById('comparison-summary').innerHTML = `
+                <p><b>Plans:</b> ${plans.map(p=>p.name).join(', ')}</p>
+                <p><b>Total beads needed:</b> ${total}</p>
+                <p><b>Checking against:</b> ${includePlanned ? 'Planned Inventory (actual + incoming)' : 'Actual Inventory'}</p>
+                ${statusMsg}
+            `;
+
+            document.getElementById('comparison-grid').innerHTML = comparison.map(c => {
+                let statusClass = c.canStartNow ? 'sufficient' : (c.canStartAfterDelivery ? '' : 'shortage');
+                let statusColor = c.canStartNow ? 'var(--success)' : (c.canStartAfterDelivery ? 'var(--warning)' : 'var(--danger)');
+                let statusText = c.canStartNow ? `+${c.haveActual - c.needed}` :
+                    (c.canStartAfterDelivery ? `Wait (+${c.incoming} coming)` : `Buy ${c.needed - c.havePlanned}+`);
+                return `<div class="comparison-item ${statusClass}" style="${!statusClass ? 'background:rgba(245,158,11,0.2);border:1px solid var(--warning);' : ''}">
+                    <b>${c.code}</b><br>
+                    Need: ${c.needed}<br>
+                    Have: ${c.haveActual}${c.incoming ? ` <span style="color:var(--success);">(+${c.incoming})</span>` : ''}<br>
+                    <span style="color:${statusColor}">${statusText}</span>
+                </div>`;
+            }).join('');
         }
+
         function deletePlan(id) { if(confirm('Delete?')) { data.plans = data.plans.filter(p => p.id !== id); saveData(); renderPlans(); showToast('Deleted'); } }
 
         function openEditPlan(id) {
@@ -948,6 +1072,7 @@
         // Shopping
         function generateShoppingList() {
             const needed = {};
+            const LOW_STOCK_THRESHOLD = 300;
 
             // Step 1: Calculate total beads needed from ALL plans
             let totalPlanNeeds = {};
@@ -955,20 +1080,25 @@
                 totalPlanNeeds[code] = (totalPlanNeeds[code]||0) + qty;
             }));
 
-            // Step 2: For each color, calculate shortage
+            // Step 2: For each color, calculate what you'd have AFTER completing all plans
             data.inventory.forEach(c => {
                 const planNeed = totalPlanNeeds[c.name] || 0;
                 const have = c.quantity;
-                const shortage = planNeed - have;
-                const lowStockNeed = have < 200 ? (200 - have) : 0;
+                const afterPlans = have - planNeed;  // What you'd have after all plans
+                const incoming = data.plannedInventory?.[c.name] || 0;
+                const afterPlansWithIncoming = afterPlans + incoming;
 
-                // Need to buy if: plans require more than we have, OR we're below 200
-                if (shortage > 0 || lowStockNeed > 0) {
+                // Show if: would drop below 300 after plans, OR already below 300
+                if (afterPlans < LOW_STOCK_THRESHOLD || have < LOW_STOCK_THRESHOLD) {
+                    const needToBuy = Math.max(0, LOW_STOCK_THRESHOLD - afterPlansWithIncoming);
                     needed[c.name] = {
                         have: have,
                         planNeed: planNeed,
-                        need: Math.max(shortage, lowStockNeed),
-                        color: c.color
+                        afterPlans: afterPlans,
+                        incoming: incoming,
+                        need: needToBuy,
+                        color: c.color,
+                        urgent: afterPlans < 0  // Not enough for plans!
                     };
                 }
             });
@@ -976,14 +1106,29 @@
             // Step 3: Check for colors in plans that aren't in inventory
             Object.entries(totalPlanNeeds).forEach(([code, qty]) => {
                 if (!needed[code] && !data.inventory.find(c => c.name === code)) {
-                    needed[code] = { have: 0, planNeed: qty, need: qty, color: '#888' };
+                    needed[code] = { have: 0, planNeed: qty, afterPlans: -qty, incoming: 0, need: qty + LOW_STOCK_THRESHOLD, color: '#888', urgent: true };
                 }
             });
 
-            const list = Object.entries(needed).sort((a,b) => b[1].need - a[1].need);
-            document.getElementById('shopping-list').innerHTML = list.length ? list.map(([code,{have,planNeed,need,color}]) =>
-                `<div class="shopping-item needed"><span><span style="display:inline-block;width:15px;height:15px;background:${color};border-radius:3px;margin-right:8px;"></span>${code}</span><span>Have: ${have}${planNeed ? ` | Plans need: ${planNeed}` : ''} | <b>Buy: ${need}+</b></span></div>`
-            ).join('') : '<p style="color:var(--success);text-align:center;">All stocked!</p>';
+            // Sort: urgent first, then by need amount
+            const list = Object.entries(needed).sort((a,b) => {
+                if (a[1].urgent !== b[1].urgent) return b[1].urgent - a[1].urgent;
+                return b[1].need - a[1].need;
+            });
+
+            document.getElementById('shopping-list').innerHTML = list.length ? `
+                <p style="color:var(--text-muted);margin-bottom:15px;">Showing colors that would drop below ${LOW_STOCK_THRESHOLD} after completing all plans</p>
+                ${list.map(([code,{have,planNeed,afterPlans,incoming,need,color,urgent}]) =>
+                `<div class="shopping-item needed" style="${urgent ? 'background:rgba(239,68,68,0.2);' : ''}">
+                    <span><span style="display:inline-block;width:15px;height:15px;background:${color};border-radius:3px;margin-right:8px;"></span>${code}</span>
+                    <span>
+                        Have: ${have}
+                        ${planNeed ? ` → After plans: <span style="color:${afterPlans < 0 ? 'var(--danger)' : afterPlans < 100 ? 'var(--warning)' : 'inherit'}">${afterPlans}</span>` : ''}
+                        ${incoming ? ` <span style="color:var(--success);">(+${incoming} coming)</span>` : ''}
+                        ${need > 0 ? ` | <b style="color:${urgent ? 'var(--danger)' : 'inherit'}">Buy: ${need}+</b>` : ' | <span style="color:var(--success);">OK with incoming</span>'}
+                    </span>
+                </div>`
+            ).join('')}` : '<p style="color:var(--success);text-align:center;">All stocked above 300!</p>';
         }
 
         // Notes
