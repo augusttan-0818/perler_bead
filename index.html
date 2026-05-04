@@ -274,14 +274,15 @@
             </div>
             <div class="card">
                 <h2>📦 Incoming Orders (Planned Inventory)</h2>
-                <p style="color:var(--text-muted);margin-bottom:15px;">Add beads you've ordered but haven't arrived yet</p>
-                <div class="form-group"><textarea id="planned-inventory-input" placeholder="A1:500, B5:1000, C3:200" rows="2"></textarea></div>
-                <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
-                    <button class="btn-success" onclick="savePlannedInventory()">Save Incoming</button>
-                    <button class="btn-primary" onclick="openModal('planned-inventory-modal')">View Full Inventory</button>
-                    <button class="btn-secondary" onclick="clearPlannedInventory()">Clear</button>
+                <p style="color:var(--text-muted);margin-bottom:15px;">Beads you've ordered but haven't arrived. Edit quantities directly below.</p>
+                <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;align-items:center;">
+                    <input type="text" id="add-incoming-code" placeholder="Color code (A1)" style="width:120px;">
+                    <input type="number" id="add-incoming-qty" placeholder="Qty" style="width:100px;">
+                    <button class="btn-success btn-sm" onclick="addIncomingColor()">+ Add</button>
+                    <button class="btn-primary btn-sm" onclick="openModal('planned-inventory-modal')">View Full Inventory</button>
+                    <button class="btn-danger btn-sm" onclick="clearPlannedInventory()">Clear All</button>
                 </div>
-                <div id="planned-inventory-display" style="margin-top:15px;"></div>
+                <div id="planned-inventory-grid" class="inventory-grid" style="max-height:200px;overflow-y:auto;"></div>
             </div>
             <div class="card">
                 <h2>Plans</h2>
@@ -292,16 +293,15 @@
                 </div>
                 <div id="plans-list"></div>
                 <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
-                    <button class="btn-primary" onclick="calculateSelectedPlans()">Check with Actual Inventory</button>
-                    <button class="btn-success" onclick="calculateWithPlanned()">Check with Planned Inventory</button>
+                    <button class="btn-primary" onclick="checkSelectedPlans()">Check Selected Plans</button>
                     <button class="btn-secondary" onclick="selectAllPlans()">Select All</button>
                     <button class="btn-secondary" onclick="deselectAllPlans()">Deselect All</button>
                 </div>
             </div>
             <div id="comparison-results" class="comparison-panel" style="display:none;">
-                <h2>Comparison</h2>
+                <h2>📊 Inventory Check</h2>
                 <div id="comparison-summary"></div>
-                <div class="comparison-grid" id="comparison-grid"></div>
+                <div id="comparison-grid"></div>
             </div>
         </div>
 
@@ -980,28 +980,59 @@
         function clearPlannedInventory() {
             if (confirm('Clear all incoming orders?')) {
                 data.plannedInventory = {};
-                document.getElementById('planned-inventory-input').value = '';
                 saveData();
-                renderPlannedInventory();
+                renderPlannedInventoryInline();
                 showToast('Cleared');
             }
         }
-        function renderPlannedInventory() {
-            const display = document.getElementById('planned-inventory-display');
+        function addIncomingColor() {
+            const code = document.getElementById('add-incoming-code').value.trim().toUpperCase();
+            const qty = parseInt(document.getElementById('add-incoming-qty').value) || 0;
+            if (!code.match(/^[A-HM]\d{1,2}$/)) return alert('Invalid color code (e.g., A1, B12, M5)');
+            if (qty <= 0) return alert('Enter a quantity > 0');
+            data.plannedInventory[code] = (data.plannedInventory[code] || 0) + qty;
+            saveData();
+            renderPlannedInventoryInline();
+            document.getElementById('add-incoming-code').value = '';
+            document.getElementById('add-incoming-qty').value = '';
+            showToast(`Added ${code}: +${qty}`);
+        }
+        function updateIncomingQty(code, val) {
+            const qty = parseInt(val) || 0;
+            if (qty <= 0) {
+                delete data.plannedInventory[code];
+            } else {
+                data.plannedInventory[code] = qty;
+            }
+            saveData();
+            renderPlannedInventoryInline();
+        }
+        function removeIncoming(code) {
+            delete data.plannedInventory[code];
+            saveData();
+            renderPlannedInventoryInline();
+            showToast(`Removed ${code}`);
+        }
+        function renderPlannedInventoryInline() {
+            const grid = document.getElementById('planned-inventory-grid');
             const entries = Object.entries(data.plannedInventory || {});
             if (entries.length === 0) {
-                display.innerHTML = '<p style="color:var(--text-muted);">No incoming orders</p>';
+                grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-muted);">No incoming orders. Add colors above.</p>';
                 return;
             }
             const sorted = sortBeadEntries(entries);
-            display.innerHTML = `<p style="color:var(--success);margin-bottom:10px;">📦 Incoming: ${entries.length} colors</p>
-                <div style="display:flex;flex-wrap:wrap;gap:5px;">${sorted.map(([c,q]) => {
-                    const inv = data.inventory.find(x => x.name === c);
-                    return `<span class="plan-bead-tag" style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;background:${inv?.color||'#888'};border-radius:50%;"></span>${c}:+${q}</span>`;
-                }).join('')}</div>`;
-            // Also populate the input field
-            document.getElementById('planned-inventory-input').value = entries.map(([c,q]) => `${c}:${q}`).join(', ');
+            grid.innerHTML = sorted.map(([code, qty]) => {
+                const inv = data.inventory.find(x => x.name === code);
+                return `<div class="bead-item" style="border:2px solid var(--success);position:relative;">
+                    <button onclick="removeIncoming('${code}')" style="position:absolute;top:2px;right:2px;background:var(--danger);border:none;color:white;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;">×</button>
+                    <div class="bead-color" style="background:${inv?.color||'#888'}"></div>
+                    <div class="bead-name">${code}</div>
+                    <input type="number" class="bead-qty-input" value="${qty}" onchange="updateIncomingQty('${code}',this.value)" style="color:var(--success);">
+                </div>`;
+            }).join('');
         }
+        // Alias for backwards compatibility
+        function renderPlannedInventory() { renderPlannedInventoryInline(); }
 
         function renderPlannedInventoryModal() {
             const search = (document.getElementById('planned-inv-search')?.value || '').toUpperCase();
@@ -1079,13 +1110,7 @@
         function selectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = true); }
         function deselectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = false); }
 
-        function calculateSelectedPlans() {
-            calculateComparison(false); // actual inventory only
-        }
-        function calculateWithPlanned() {
-            calculateComparison(true); // include planned inventory
-        }
-        function calculateComparison(includePlanned) {
+        function checkSelectedPlans() {
             const ids = [...document.querySelectorAll('.plan-checkbox:checked')].map(c => c.dataset.planId);
             if(!ids.length) return alert('Select plans');
             const plans = data.plans.filter(p => ids.includes(p.id)), combined = {};
@@ -1093,55 +1118,77 @@
 
             const comparison = Object.entries(combined).sort((a,b)=>a[0].localeCompare(b[0])).map(([code,needed]) => {
                 const inv = data.inventory.find(c => c.name === code);
-                const haveActual = inv?.quantity || 0;
+                const have = inv?.quantity || 0;
                 const incoming = data.plannedInventory?.[code] || 0;
-                const havePlanned = haveActual + incoming;
-                const haveUsed = includePlanned ? havePlanned : haveActual;
+                const leftAfterActual = have - needed;
+                const leftAfterPlanned = have + incoming - needed;
+                const needToBuy = leftAfterPlanned < 0 ? Math.abs(leftAfterPlanned) : 0;
                 return {
-                    code, needed,
-                    haveActual, incoming, havePlanned,
-                    diff: haveUsed - needed,
-                    shortage: haveUsed < needed,
-                    canStartNow: haveActual >= needed,
-                    canStartAfterDelivery: havePlanned >= needed
+                    code, needed, have, incoming,
+                    leftAfterActual,
+                    leftAfterPlanned,
+                    needToBuy,
+                    canStartNow: leftAfterActual >= 0,
+                    canStartAfterDelivery: leftAfterPlanned >= 0,
+                    color: inv?.color || '#888'
                 };
             });
 
             const panel = document.getElementById('comparison-results');
             panel.style.display = 'block';
             const total = Object.values(combined).reduce((a,b)=>a+b,0);
-            const short = comparison.filter(c => c.shortage);
             const canStartNow = comparison.every(c => c.canStartNow);
             const canStartAfterDelivery = comparison.every(c => c.canStartAfterDelivery);
+            const shortNow = comparison.filter(c => !c.canStartNow).length;
+            const shortAfterDelivery = comparison.filter(c => !c.canStartAfterDelivery).length;
 
             let statusMsg = '';
             if (canStartNow) {
-                statusMsg = '<p style="color:var(--success);font-size:1.1rem;">✅ Can start NOW! You have all beads.</p>';
+                statusMsg = '<div style="background:rgba(16,185,129,0.2);padding:15px;border-radius:10px;margin:10px 0;"><span style="font-size:1.5rem;">✅</span> <b>Can start NOW!</b> You have all beads.</div>';
             } else if (canStartAfterDelivery) {
-                statusMsg = '<p style="color:var(--warning);font-size:1.1rem;">📦 Wait for delivery - you\'ll have enough after orders arrive</p>';
+                statusMsg = `<div style="background:rgba(245,158,11,0.2);padding:15px;border-radius:10px;margin:10px 0;"><span style="font-size:1.5rem;">📦</span> <b>Wait for delivery</b> - Short on ${shortNow} colors now, but OK after incoming orders arrive.</div>`;
             } else {
-                statusMsg = `<p style="color:var(--danger);font-size:1.1rem;">🛒 Need to buy more - short on ${short.length} colors</p>`;
+                statusMsg = `<div style="background:rgba(239,68,68,0.2);padding:15px;border-radius:10px;margin:10px 0;"><span style="font-size:1.5rem;">🛒</span> <b>Need to buy more</b> - Still short on ${shortAfterDelivery} colors even after incoming orders.</div>`;
             }
 
             document.getElementById('comparison-summary').innerHTML = `
                 <p><b>Plans:</b> ${plans.map(p=>p.name).join(', ')}</p>
-                <p><b>Total beads needed:</b> ${total}</p>
-                <p><b>Checking against:</b> ${includePlanned ? 'Planned Inventory (actual + incoming)' : 'Actual Inventory'}</p>
+                <p><b>Total beads needed:</b> ${total.toLocaleString()}</p>
                 ${statusMsg}
             `;
 
-            document.getElementById('comparison-grid').innerHTML = comparison.map(c => {
-                let statusClass = c.canStartNow ? 'sufficient' : (c.canStartAfterDelivery ? '' : 'shortage');
-                let statusColor = c.canStartNow ? 'var(--success)' : (c.canStartAfterDelivery ? 'var(--warning)' : 'var(--danger)');
-                let statusText = c.canStartNow ? `+${c.haveActual - c.needed}` :
-                    (c.canStartAfterDelivery ? `Wait (+${c.incoming} coming)` : `Buy ${c.needed - c.havePlanned}+`);
-                return `<div class="comparison-item ${statusClass}" style="${!statusClass ? 'background:rgba(245,158,11,0.2);border:1px solid var(--warning);' : ''}">
-                    <b>${c.code}</b><br>
-                    Need: ${c.needed}<br>
-                    Have: ${c.haveActual}${c.incoming ? ` <span style="color:var(--success);">(+${c.incoming})</span>` : ''}<br>
-                    <span style="color:${statusColor}">${statusText}</span>
-                </div>`;
-            }).join('');
+            // Create table view
+            document.getElementById('comparison-grid').innerHTML = `
+                <table style="width:100%;border-collapse:collapse;margin-top:15px;font-size:0.85rem;">
+                    <thead>
+                        <tr style="background:var(--bg-input);text-align:left;">
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Color</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Need</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Have</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Left (Now)</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Incoming</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Left (After)</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Buy?</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${comparison.map(c => {
+                            const leftNowColor = c.leftAfterActual >= 0 ? 'var(--success)' : 'var(--danger)';
+                            const leftAfterColor = c.leftAfterPlanned >= 0 ? 'var(--success)' : 'var(--danger)';
+                            const rowBg = c.needToBuy > 0 ? 'rgba(239,68,68,0.1)' : (c.leftAfterActual < 0 ? 'rgba(245,158,11,0.1)' : '');
+                            return `<tr style="background:${rowBg};">
+                                <td style="padding:8px;border-bottom:1px solid var(--border);"><span style="display:inline-block;width:12px;height:12px;background:${c.color};border-radius:50%;margin-right:5px;"></span>${c.code}</td>
+                                <td style="padding:8px;border-bottom:1px solid var(--border);">${c.needed}</td>
+                                <td style="padding:8px;border-bottom:1px solid var(--border);">${c.have}</td>
+                                <td style="padding:8px;border-bottom:1px solid var(--border);color:${leftNowColor};font-weight:bold;">${c.leftAfterActual >= 0 ? '+' : ''}${c.leftAfterActual}</td>
+                                <td style="padding:8px;border-bottom:1px solid var(--border);color:var(--success);">${c.incoming > 0 ? '+' + c.incoming : '-'}</td>
+                                <td style="padding:8px;border-bottom:1px solid var(--border);color:${leftAfterColor};font-weight:bold;">${c.leftAfterPlanned >= 0 ? '+' : ''}${c.leftAfterPlanned}</td>
+                                <td style="padding:8px;border-bottom:1px solid var(--border);color:var(--danger);font-weight:bold;">${c.needToBuy > 0 ? c.needToBuy + '+' : '✓'}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
         }
 
         function deletePlan(id) { if(confirm('Delete?')) { data.plans = data.plans.filter(p => p.id !== id); saveData(); renderPlans(); showToast('Deleted'); } }
