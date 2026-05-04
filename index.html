@@ -581,6 +581,7 @@
         }
 
         function initFirebase() {
+            console.log('initFirebase started');
             const config = {
                 apiKey: "AIzaSyC8OQ077Ax3EXiNg10kqQLawdJjWDQzRfI",
                 authDomain: "perler-beads-c656b.firebaseapp.com",
@@ -588,8 +589,10 @@
                 projectId: "perler-beads-c656b"
             };
             try {
+                console.log('Initializing Firebase...');
                 firebase.initializeApp(config);
                 database = firebase.database();
+                console.log('Firebase initialized, connecting to database...');
 
                 let dataLoaded = false;
 
@@ -619,6 +622,7 @@
                     document.getElementById('sync-status').className = 'sync-status ' + (s.val() ? 'connected' : 'offline');
                 });
                 database.ref('perlerData').on('value', s => {
+                    console.log('Firebase data received!', s.val() ? 'has data' : 'empty');
                     // Skip if we're in the middle of saving (prevents race condition)
                     if (isSaving) {
                         console.log('Skipping Firebase update - save in progress');
