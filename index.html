@@ -99,6 +99,7 @@
         .folder-btn { padding: 8px 16px; border-radius: 20px; cursor: pointer; border: 2px solid var(--border); background: var(--bg-input); color: var(--text); }
         .folder-btn.active { border-color: var(--primary); background: var(--primary); }
         .alphabet-filter.active { background: var(--primary); color: white; }
+        .planned-inv-filter.active { background: var(--primary); color: white; }
         .chart-bar { height: 20px; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 5px; margin: 5px 0; transition: width 0.5s; }
         .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .loading-overlay.hidden { display: none; }
@@ -275,8 +276,9 @@
                 <h2>📦 Incoming Orders (Planned Inventory)</h2>
                 <p style="color:var(--text-muted);margin-bottom:15px;">Add beads you've ordered but haven't arrived yet</p>
                 <div class="form-group"><textarea id="planned-inventory-input" placeholder="A1:500, B5:1000, C3:200" rows="2"></textarea></div>
-                <div style="display:flex;gap:10px;margin-top:10px;">
+                <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
                     <button class="btn-success" onclick="savePlannedInventory()">Save Incoming</button>
+                    <button class="btn-primary" onclick="openModal('planned-inventory-modal')">View Full Inventory</button>
                     <button class="btn-secondary" onclick="clearPlannedInventory()">Clear</button>
                 </div>
                 <div id="planned-inventory-display" style="margin-top:15px;"></div>
@@ -452,6 +454,35 @@
         </div>
     </div>
 
+    <div class="modal-overlay" id="planned-inventory-modal">
+        <div class="modal" style="max-width:900px;">
+            <h2>📦 Planned Inventory (Actual + Incoming)</h2>
+            <p style="color:var(--text-muted);margin-bottom:15px;">This shows what your inventory will look like after incoming orders arrive</p>
+            <div class="inventory-controls" style="margin-bottom:15px;">
+                <input type="text" id="planned-inv-search" placeholder="Search (A1, B5...)..." oninput="renderPlannedInventoryModal()">
+                <button class="btn-sm btn-secondary" onclick="setPlannedInvSort('name')">A-Z</button>
+                <button class="btn-sm btn-secondary" onclick="setPlannedInvSort('diff')">By Change</button>
+            </div>
+            <div class="inventory-controls" style="gap:5px;margin-bottom:15px;">
+                <span style="color:var(--text-muted);margin-right:5px;">Filter:</span>
+                <button class="btn-sm btn-secondary planned-inv-filter active" onclick="filterPlannedInvByLetter('')">All</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('A')">A</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('B')">B</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('C')">C</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('D')">D</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('E')">E</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('F')">F</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('G')">G</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('H')">H</button>
+                <button class="btn-sm btn-secondary planned-inv-filter" onclick="filterPlannedInvByLetter('M')">M</button>
+            </div>
+            <div class="inventory-grid" id="planned-inventory-grid" style="max-height:400px;overflow-y:auto;"></div>
+            <div style="margin-top:20px;">
+                <button class="btn-secondary" onclick="closeModal('planned-inventory-modal')">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast">Success!</div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -467,6 +498,9 @@
         let currentSort = 'name', database = null, showFavoritesOnly = false;
         let planBeadSort = 'qty';  // 'qty' or 'color'
         let inventoryLetterFilter = '';  // Filter by letter (A, B, C...)
+        let isSaving = false;  // Prevent race condition during save
+        let plannedInvLetterFilter = '';  // Filter for planned inventory modal
+        let plannedInvSort = 'name';  // Sort for planned inventory modal
         let timerInterval = null, timerSeconds = 0, timerRunning = false;
 
         document.addEventListener('DOMContentLoaded', () => initFirebase());
@@ -503,6 +537,11 @@
                     document.getElementById('sync-status').className = 'sync-status ' + (s.val() ? 'connected' : 'offline');
                 });
                 database.ref('perlerData').on('value', s => {
+                    // Skip if we're in the middle of saving (prevents race condition)
+                    if (isSaving) {
+                        console.log('Skipping Firebase update - save in progress');
+                        return;
+                    }
                     if (s.val()) {
                         const firebaseData = s.val();
                         // Properly convert Firebase objects back to arrays
@@ -524,7 +563,17 @@
             } catch(e) { console.error(e); }
         }
 
-        function saveData() { if(database) database.ref('perlerData').set(data); }
+        function saveData() {
+            if(database) {
+                isSaving = true;
+                database.ref('perlerData').set(data).then(() => {
+                    setTimeout(() => { isSaving = false; }, 500); // Small delay to ensure sync completes
+                }).catch(err => {
+                    console.error('Save failed:', err);
+                    isSaving = false;
+                });
+            }
+        }
         function showTab(id) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -953,6 +1002,79 @@
             // Also populate the input field
             document.getElementById('planned-inventory-input').value = entries.map(([c,q]) => `${c}:${q}`).join(', ');
         }
+
+        function renderPlannedInventoryModal() {
+            const search = (document.getElementById('planned-inv-search')?.value || '').toUpperCase();
+
+            // Build combined inventory (actual + incoming)
+            let items = data.inventory.map(c => {
+                const incoming = data.plannedInventory?.[c.name] || 0;
+                return {
+                    name: c.name,
+                    color: c.color,
+                    actual: c.quantity,
+                    incoming: incoming,
+                    planned: c.quantity + incoming,
+                    hasIncoming: incoming > 0
+                };
+            });
+
+            // Apply search filter
+            if (search) {
+                items = items.filter(c => c.name.toUpperCase().includes(search));
+            }
+
+            // Apply letter filter
+            if (plannedInvLetterFilter) {
+                items = items.filter(c => c.name.startsWith(plannedInvLetterFilter));
+            }
+
+            // Sort
+            if (plannedInvSort === 'diff') {
+                items.sort((a, b) => b.incoming - a.incoming);
+            } else {
+                items.sort((a, b) => {
+                    const am = a.name.match(/^([A-Z])(\d+)$/), bm = b.name.match(/^([A-Z])(\d+)$/);
+                    if (am && bm) return am[1] === bm[1] ? parseInt(am[2]) - parseInt(bm[2]) : am[1].localeCompare(bm[1]);
+                    return a.name.localeCompare(b.name);
+                });
+            }
+
+            document.getElementById('planned-inventory-grid').innerHTML = items.map(c => `
+                <div class="bead-item ${c.planned === 0 ? 'out-of-stock' : c.planned < 200 ? 'low-stock' : ''}" style="${c.hasIncoming ? 'border:2px solid var(--success);' : ''}">
+                    <div class="bead-color" style="background:${c.color}"></div>
+                    <div class="bead-name">${c.name}</div>
+                    <div style="font-size:0.75rem;color:var(--text-muted);">Now: ${c.actual}</div>
+                    ${c.hasIncoming ? `<div style="font-size:0.75rem;color:var(--success);">+${c.incoming}</div>` : ''}
+                    <div style="font-size:0.9rem;font-weight:bold;">= ${c.planned}</div>
+                </div>
+            `).join('') || '<p style="grid-column:1/-1;text-align:center;color:var(--text-muted);">No colors found</p>';
+        }
+
+        function setPlannedInvSort(type) {
+            plannedInvSort = type;
+            renderPlannedInventoryModal();
+        }
+
+        function filterPlannedInvByLetter(letter) {
+            plannedInvLetterFilter = letter;
+            document.querySelectorAll('.planned-inv-filter').forEach(btn => {
+                btn.classList.remove('active');
+                if ((letter === '' && btn.textContent === 'All') || btn.textContent === letter) {
+                    btn.classList.add('active');
+                }
+            });
+            renderPlannedInventoryModal();
+        }
+
+        // Render modal when opened
+        const originalOpenModal = openModal;
+        openModal = function(id) {
+            originalOpenModal(id);
+            if (id === 'planned-inventory-modal') {
+                renderPlannedInventoryModal();
+            }
+        };
 
         function selectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = true); }
         function deselectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = false); }
