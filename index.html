@@ -627,13 +627,9 @@
                     const dataSizeMB = (dataSize / 1024 / 1024).toFixed(2);
                     console.log(`Saving data: ${dataSizeMB}MB (${(dataSize/1024).toFixed(1)}KB)`);
 
-                    if (dataSize > 9000000) { // 9MB warning (Firebase limit is 10MB)
-                        showToast('❌ SAVE FAILED: Database full! Go to Settings > Compress Images');
-                        alert(`SAVE FAILED!\n\nDatabase is ${dataSizeMB}MB (limit is 10MB)\n\nGo to Settings > Compress All Images`);
-                        isSaving = false;
-                        updateSaveIndicator(false);
-                        reject('Data too large');
-                        return;
+                    // Warning if data is large, but don't block - let Firebase decide
+                    if (dataSize > 10000000) {
+                        console.warn(`Data is ${dataSizeMB}MB - may exceed Firebase 10MB per-write limit`);
                     }
 
                     console.log('Attempting Firebase save...');
@@ -659,8 +655,14 @@
                         resolve();
                     }).catch(err => {
                         console.error('Save failed:', err);
-                        showToast('❌ SAVE FAILED! ' + (err.message || 'Check console for details'));
-                        alert('SAVE FAILED!\n\nError: ' + (err.message || err) + '\n\nYour data was NOT saved. Try removing images.');
+                        const errorMsg = err.message || String(err);
+                        if (errorMsg.includes('10485760') || errorMsg.includes('size') || dataSize > 10000000) {
+                            showToast('❌ Data too large! Keep removing images.');
+                            alert(`SAVE FAILED - DATA TOO LARGE!\n\nYour data is ${dataSizeMB}MB.\nFirebase limit is 10MB per save.\n\nKeep removing images until under 10MB!`);
+                        } else {
+                            showToast('❌ SAVE FAILED! ' + errorMsg);
+                            alert('SAVE FAILED!\n\nError: ' + errorMsg);
+                        }
                         isSaving = false;
                         updateSaveIndicator(false);
                         reject(err);
@@ -983,20 +985,10 @@
 
                 data.projects.push(newProject);
 
-                // Check total data size before saving
+                // Check total data size (warning only)
                 const totalSize = JSON.stringify(data).length;
-                if (totalSize > 9000000) {
-                    // Rollback project and inventory changes
-                    data.projects.pop();
-                    Object.entries(beadsUsed).forEach(([code, amt]) => {
-                        const c = data.inventory.find(x => x.name === code);
-                        if(c) c.quantity += amt;
-                    });
-                    btn.classList.remove('btn-loading');
-                    btn.textContent = 'Save Project';
-                    showToast('❌ SAVE FAILED: Data too large! Remove image or compress in Settings.');
-                    alert('SAVE FAILED!\n\nData is too large for Firebase.\n\nTry:\n1. Remove the image\n2. Go to Settings > Compress All Images');
-                    return;
+                if (totalSize > 10000000) {
+                    console.warn(`Data size: ${(totalSize/1024/1024).toFixed(2)}MB - may exceed Firebase limit`);
                 }
 
                 // Show loading state
@@ -1212,14 +1204,10 @@
             const newPlan = {id: Date.now().toString(), name, beads, image: imageData, createdAt: new Date().toISOString()};
             data.plans.push(newPlan);
 
-            // Check total data size before saving
+            // Check total data size (warning only)
             const totalSize = JSON.stringify(data).length;
-            if (totalSize > 9000000) {
-                // Rollback and warn
-                data.plans.pop();
-                showToast('❌ SAVE FAILED: Data too large! Remove image or compress in Settings.');
-                alert('SAVE FAILED!\n\nData is too large for Firebase.\n\nTry:\n1. Remove the image\n2. Go to Settings > Compress All Images');
-                return;
+            if (totalSize > 10000000) {
+                console.warn(`Data size: ${(totalSize/1024/1024).toFixed(2)}MB - may exceed Firebase limit`);
             }
 
             // Show loading state
