@@ -212,7 +212,7 @@
                         <select id="project-folder"><option value="">No Folder</option></select>
                     </div>
                     <div class="form-group"><label>Made By</label>
-                        <select id="project-person"><option value="person1">Augy</option><option value="person2">Angelala</option><option value="both">Both</option></select>
+                        <select id="project-person"><option value="person1">Augy</option><option value="person2">Angelala</option><option value="both">Both</option><option value="others">Others</option></select>
                     </div>
                     <div class="form-group"><label>Time (min)</label><input type="number" id="project-time" placeholder="60"></div>
                     <div class="form-group"><label>Date</label><input type="date" id="project-date"></div>
@@ -237,7 +237,7 @@
                     <input type="text" id="project-search" placeholder="Search projects..." oninput="renderProjects()">
                     <select id="project-filter-folder" onchange="renderProjects()"><option value="">All Folders</option></select>
                     <select id="project-filter-person" onchange="renderProjects()">
-                        <option value="">All People</option><option value="person1">Person 1</option><option value="person2">Person 2</option><option value="both">Both</option>
+                        <option value="">All People</option><option value="person1">Augy</option><option value="person2">Angelala</option><option value="both">Both</option><option value="others">Others</option>
                     </select>
                     <button class="btn-sm btn-secondary" onclick="toggleFavoritesOnly()">⭐ Favorites</button>
                 </div>
@@ -391,7 +391,7 @@
                     <select id="edit-project-folder"><option value="">No Folder</option></select>
                 </div>
                 <div class="form-group"><label>Made By</label>
-                    <select id="edit-project-person"><option value="person1">Augy</option><option value="person2">Angelala</option><option value="both">Both</option></select>
+                    <select id="edit-project-person"><option value="person1">Augy</option><option value="person2">Angelala</option><option value="both">Both</option><option value="others">Others</option></select>
                 </div>
                 <div class="form-group"><label>Time (min)</label><input type="number" id="edit-project-time"></div>
                 <div class="form-group"><label>Date</label><input type="date" id="edit-project-date"></div>
@@ -635,7 +635,7 @@
             document.getElementById('project-grid').innerHTML = projects.map(p => {
                 const folder = data.folders.find(f => f.id === p.folderId);
                 const tags = (p.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
-                const person = p.person === 'person1' ? data.settings.person1Name : p.person === 'person2' ? data.settings.person2Name : 'Both';
+                const person = p.person === 'person1' ? data.settings.person1Name : p.person === 'person2' ? data.settings.person2Name : p.person === 'others' ? 'Others' : 'Both';
                 const beadsList = Object.entries(p.beadsUsed || {}).map(([code,qty]) => {
                     const c = data.inventory.find(x => x.name === code);
                     return `<span class="plan-bead-tag" style="display:inline-flex;align-items:center;gap:3px;"><span style="width:10px;height:10px;background:${c?.color||'#888'};border-radius:50%;"></span>${code}:${qty}</span>`;
@@ -1006,6 +1006,8 @@
             const p1 = data.projects.filter(p => p.person === 'person1').length;
             const p2 = data.projects.filter(p => p.person === 'person2').length;
             const both = data.projects.filter(p => p.person === 'both').length;
+            const others = data.projects.filter(p => p.person === 'others').length;
+            const maxProjects = Math.max(p1, p2, both, others, 1);
             const colorUsage = {};
             data.usageLog.forEach(u => { const c = data.inventory.find(x => x.id === u.colorId); if(c) colorUsage[c.name] = (colorUsage[c.name]||0) + u.amount; });
             const topColors = Object.entries(colorUsage).sort((a,b) => b[1] - a[1]).slice(0,10);
@@ -1014,9 +1016,10 @@
             document.getElementById('stats-charts').innerHTML = `
                 <h3>Projects by Person</h3>
                 <div style="margin:15px 0;">
-                    <div>${data.settings.person1Name}: ${p1}</div><div class="chart-bar" style="width:${(p1/Math.max(p1,p2,both,1))*100}%"></div>
-                    <div>${data.settings.person2Name}: ${p2}</div><div class="chart-bar" style="width:${(p2/Math.max(p1,p2,both,1))*100}%"></div>
-                    <div>Both: ${both}</div><div class="chart-bar" style="width:${(both/Math.max(p1,p2,both,1))*100}%"></div>
+                    <div>${data.settings.person1Name}: ${p1}</div><div class="chart-bar" style="width:${(p1/maxProjects)*100}%"></div>
+                    <div>${data.settings.person2Name}: ${p2}</div><div class="chart-bar" style="width:${(p2/maxProjects)*100}%"></div>
+                    <div>Both: ${both}</div><div class="chart-bar" style="width:${(both/maxProjects)*100}%"></div>
+                    <div>Others: ${others}</div><div class="chart-bar" style="width:${(others/maxProjects)*100}%"></div>
                 </div>
                 <h3>Top 10 Used Colors</h3>
                 ${topColors.map(([name,count]) => {
