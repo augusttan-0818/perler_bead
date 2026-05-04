@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+test_image.png
+output_*.png
+.env
+venv/
