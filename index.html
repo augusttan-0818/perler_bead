@@ -438,6 +438,23 @@
 
         document.addEventListener('DOMContentLoaded', () => initFirebase());
 
+        // Convert Firebase objects back to arrays (Firebase converts arrays to objects)
+        function ensureArray(obj) {
+            if (!obj) return [];
+            if (Array.isArray(obj)) return obj;
+            // Firebase returns objects like {"0": {...}, "1": {...}} - convert back to array
+            if (typeof obj === 'object') {
+                const arr = [];
+                Object.keys(obj).forEach(key => {
+                    const idx = parseInt(key);
+                    if (!isNaN(idx)) arr[idx] = obj[key];
+                });
+                // Remove any undefined holes in array
+                return arr.filter(item => item !== undefined);
+            }
+            return [];
+        }
+
         function initFirebase() {
             const config = {
                 apiKey: "AIzaSyC8OQ077Ax3EXiNg10kqQLawdJjWDQzRfI",
@@ -454,9 +471,16 @@
                 });
                 database.ref('perlerData').on('value', s => {
                     if (s.val()) {
-                        data = {...data, ...s.val()};
-                        ['inventory','projects','usageLog','plans','folders','notes'].forEach(k => { if(!data[k]) data[k]=[]; });
-                        if(!data.settings) data.settings = {person1Name:'Person 1',person2Name:'Person 2'};
+                        const firebaseData = s.val();
+                        // Properly convert Firebase objects back to arrays
+                        data.inventory = ensureArray(firebaseData.inventory);
+                        data.projects = ensureArray(firebaseData.projects);
+                        data.usageLog = ensureArray(firebaseData.usageLog);
+                        data.plans = ensureArray(firebaseData.plans);
+                        data.folders = ensureArray(firebaseData.folders);
+                        data.notes = ensureArray(firebaseData.notes);
+                        data.settings = firebaseData.settings || {person1Name:'Augy',person2Name:'Angelala'};
+                        data.lastUsage = firebaseData.lastUsage || null;
                     }
                     document.getElementById('loading-overlay').classList.add('hidden');
                     document.getElementById('main-app').style.display = 'block';
@@ -924,18 +948,41 @@
         // Shopping
         function generateShoppingList() {
             const needed = {};
-            data.inventory.filter(c => c.quantity < 200).forEach(c => needed[c.name] = {have: c.quantity, need: 200 - c.quantity, color: c.color});
+
+            // Step 1: Calculate total beads needed from ALL plans
+            let totalPlanNeeds = {};
             data.plans.forEach(p => Object.entries(p.beads||{}).forEach(([code,qty]) => {
-                const inv = data.inventory.find(c => c.name === code);
-                const have = inv?.quantity || 0;
-                if(have < qty) {
-                    if(!needed[code]) needed[code] = {have, need: 0, color: inv?.color || '#888'};
-                    needed[code].need = Math.max(needed[code].need, qty - have);
-                }
+                totalPlanNeeds[code] = (totalPlanNeeds[code]||0) + qty;
             }));
+
+            // Step 2: For each color, calculate shortage
+            data.inventory.forEach(c => {
+                const planNeed = totalPlanNeeds[c.name] || 0;
+                const have = c.quantity;
+                const shortage = planNeed - have;
+                const lowStockNeed = have < 200 ? (200 - have) : 0;
+
+                // Need to buy if: plans require more than we have, OR we're below 200
+                if (shortage > 0 || lowStockNeed > 0) {
+                    needed[c.name] = {
+                        have: have,
+                        planNeed: planNeed,
+                        need: Math.max(shortage, lowStockNeed),
+                        color: c.color
+                    };
+                }
+            });
+
+            // Step 3: Check for colors in plans that aren't in inventory
+            Object.entries(totalPlanNeeds).forEach(([code, qty]) => {
+                if (!needed[code] && !data.inventory.find(c => c.name === code)) {
+                    needed[code] = { have: 0, planNeed: qty, need: qty, color: '#888' };
+                }
+            });
+
             const list = Object.entries(needed).sort((a,b) => b[1].need - a[1].need);
-            document.getElementById('shopping-list').innerHTML = list.length ? list.map(([code,{have,need,color}]) =>
-                `<div class="shopping-item needed"><span><span style="display:inline-block;width:15px;height:15px;background:${color};border-radius:3px;margin-right:8px;"></span>${code}</span><span>Have: ${have} | Need: ${need}+</span></div>`
+            document.getElementById('shopping-list').innerHTML = list.length ? list.map(([code,{have,planNeed,need,color}]) =>
+                `<div class="shopping-item needed"><span><span style="display:inline-block;width:15px;height:15px;background:${color};border-radius:3px;margin-right:8px;"></span>${code}</span><span>Have: ${have}${planNeed ? ` | Plans need: ${planNeed}` : ''} | <b>Buy: ${need}+</b></span></div>`
             ).join('') : '<p style="color:var(--success);text-align:center;">All stocked!</p>';
         }
 
