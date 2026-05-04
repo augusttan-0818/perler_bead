@@ -590,6 +590,30 @@
             try {
                 firebase.initializeApp(config);
                 database = firebase.database();
+
+                let dataLoaded = false;
+
+                // Timeout - if Firebase doesn't respond in 15 seconds, show error
+                setTimeout(() => {
+                    if (!dataLoaded) {
+                        document.getElementById('loading-overlay').innerHTML = `
+                            <div style="text-align:center;color:white;padding:20px;">
+                                <h2>⚠️ Firebase Connection Issue</h2>
+                                <p style="margin:15px 0;">Could not load data. Possible causes:</p>
+                                <ul style="text-align:left;max-width:400px;margin:0 auto;">
+                                    <li>Firebase download limit exceeded (resets daily)</li>
+                                    <li>Network connection issue</li>
+                                    <li>Firebase service down</li>
+                                </ul>
+                                <div style="margin-top:20px;">
+                                    <button onclick="location.reload()" style="padding:10px 20px;font-size:16px;cursor:pointer;margin:5px;">🔄 Retry</button>
+                                    <button onclick="loadEmpty()" style="padding:10px 20px;font-size:16px;cursor:pointer;margin:5px;">📝 Load Empty (Offline Mode)</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }, 15000);
+
                 database.ref('.info/connected').on('value', s => {
                     document.getElementById('sync-status').textContent = s.val() ? 'Synced' : 'Offline';
                     document.getElementById('sync-status').className = 'sync-status ' + (s.val() ? 'connected' : 'offline');
@@ -600,6 +624,7 @@
                         console.log('Skipping Firebase update - save in progress');
                         return;
                     }
+                    dataLoaded = true;
                     if (s.val()) {
                         const firebaseData = s.val();
                         // Properly convert Firebase objects back to arrays
@@ -617,8 +642,29 @@
                     document.getElementById('main-app').style.display = 'block';
                     document.getElementById('project-date').valueAsDate = new Date();
                     renderAll();
+                }, err => {
+                    console.error('Firebase load error:', err);
+                    document.getElementById('loading-overlay').innerHTML = `
+                        <div style="text-align:center;color:white;padding:20px;">
+                            <h2>❌ Firebase Error</h2>
+                            <p style="margin:15px 0;">${err.message || 'Failed to load data'}</p>
+                            <div style="margin-top:20px;">
+                                <button onclick="location.reload()" style="padding:10px 20px;font-size:16px;cursor:pointer;margin:5px;">🔄 Retry</button>
+                                <button onclick="loadEmpty()" style="padding:10px 20px;font-size:16px;cursor:pointer;margin:5px;">📝 Load Empty</button>
+                            </div>
+                        </div>
+                    `;
                 });
             } catch(e) { console.error(e); }
+        }
+
+        // Load app with empty data (offline mode)
+        function loadEmpty() {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('project-date').valueAsDate = new Date();
+            showToast('⚠️ Loaded in offline mode - data not synced');
+            renderAll();
         }
 
         function saveData() {
