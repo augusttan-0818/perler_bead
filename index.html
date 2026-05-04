@@ -98,6 +98,7 @@
         .folder-list { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
         .folder-btn { padding: 8px 16px; border-radius: 20px; cursor: pointer; border: 2px solid var(--border); background: var(--bg-input); color: var(--text); }
         .folder-btn.active { border-color: var(--primary); background: var(--primary); }
+        .alphabet-filter.active { background: var(--primary); color: white; }
         .chart-bar { height: 20px; background: linear-gradient(90deg, var(--primary), var(--secondary)); border-radius: 5px; margin: 5px 0; transition: width 0.5s; }
         .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 2000; }
         .loading-overlay.hidden { display: none; }
@@ -172,6 +173,19 @@
                     <button class="btn-sm btn-secondary" onclick="sortInventory('asc')">↑ Low</button>
                     <button class="btn-sm btn-secondary" onclick="sortInventory('desc')">↓ High</button>
                     <button class="btn-sm btn-secondary" onclick="sortInventory('name')">A-Z</button>
+                </div>
+                <div class="inventory-controls" style="gap:5px;">
+                    <span style="color:var(--text-muted);margin-right:5px;">Filter:</span>
+                    <button class="btn-sm btn-secondary alphabet-filter active" onclick="filterByLetter('')">All</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('A')">A</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('B')">B</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('C')">C</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('D')">D</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('E')">E</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('F')">F</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('G')">G</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('H')">H</button>
+                    <button class="btn-sm btn-secondary alphabet-filter" onclick="filterByLetter('M')">M</button>
                 </div>
                 <div class="inventory-controls">
                     <button class="btn-primary" onclick="openModal('add-color-modal')">+ Add Color</button>
@@ -452,6 +466,7 @@
         };
         let currentSort = 'name', database = null, showFavoritesOnly = false;
         let planBeadSort = 'qty';  // 'qty' or 'color'
+        let inventoryLetterFilter = '';  // Filter by letter (A, B, C...)
         let timerInterval = null, timerSeconds = 0, timerRunning = false;
 
         document.addEventListener('DOMContentLoaded', () => initFirebase());
@@ -550,6 +565,10 @@
         function renderInventory() {
             const search = (document.getElementById('inventory-search')?.value || '').toUpperCase();
             let items = data.inventory.filter(c => c.name.toUpperCase().includes(search));
+            // Apply letter filter
+            if (inventoryLetterFilter) {
+                items = items.filter(c => c.name.startsWith(inventoryLetterFilter));
+            }
             if(currentSort === 'asc') items.sort((a,b) => a.quantity - b.quantity);
             else if(currentSort === 'desc') items.sort((a,b) => b.quantity - a.quantity);
             else items.sort((a,b) => {
@@ -557,6 +576,7 @@
                 if(am && bm) return am[1] === bm[1] ? parseInt(am[2]) - parseInt(bm[2]) : am[1].localeCompare(bm[1]);
                 return a.name.localeCompare(b.name);
             });
+            const filterLabel = inventoryLetterFilter ? ` (${inventoryLetterFilter}: ${items.length} colors)` : '';
             document.getElementById('inventory-grid').innerHTML = items.map(c => `
                 <div class="bead-item ${c.quantity === 0 ? 'out-of-stock' : c.quantity < 200 ? 'low-stock' : ''}">
                     <div class="bead-color" style="background:${c.color}"></div>
@@ -567,6 +587,17 @@
         }
         function filterInventory() { renderInventory(); }
         function sortInventory(type) { currentSort = type; renderInventory(); }
+        function filterByLetter(letter) {
+            inventoryLetterFilter = letter;
+            // Update active button styling
+            document.querySelectorAll('.alphabet-filter').forEach(btn => {
+                btn.classList.remove('active');
+                if ((letter === '' && btn.textContent === 'All') || btn.textContent === letter) {
+                    btn.classList.add('active');
+                }
+            });
+            renderInventory();
+        }
         function updateQty(id, val) { const c = data.inventory.find(x => x.id === id); if(c) { c.quantity = Math.max(0, parseInt(val)||0); saveData(); renderDashboard(); } }
         function addColor() {
             const name = document.getElementById('new-color-name').value.trim().toUpperCase();
