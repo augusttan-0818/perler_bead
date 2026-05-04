@@ -682,6 +682,40 @@
             }
         }
 
+        // Incremental save functions - save only specific parts
+        function savePartial(path, value) {
+            return new Promise((resolve, reject) => {
+                if (!database) {
+                    reject('No database');
+                    return;
+                }
+                isSaving = true;
+                updateSaveIndicator(true);
+                const size = JSON.stringify(value).length;
+                console.log(`Saving ${path}: ${(size/1024).toFixed(1)}KB`);
+
+                database.ref('perlerData/' + path).set(value).then(() => {
+                    console.log(`Saved ${path} successfully`);
+                    setTimeout(() => { isSaving = false; updateSaveIndicator(false); }, 300);
+                    resolve();
+                }).catch(err => {
+                    console.error(`Failed to save ${path}:`, err);
+                    showToast('❌ Save failed: ' + (err.message || err));
+                    isSaving = false;
+                    updateSaveIndicator(false);
+                    reject(err);
+                });
+            });
+        }
+
+        function saveProjects() { return savePartial('projects', data.projects); }
+        function savePlans() { return savePartial('plans', data.plans); }
+        function saveInventory() { return savePartial('inventory', data.inventory); }
+        function savePlannedInventory() { return savePartial('plannedInventory', data.plannedInventory); }
+        function saveSettings() { return savePartial('settings', data.settings); }
+        function saveFolders() { return savePartial('folders', data.folders); }
+        function saveNotes() { return savePartial('notes', data.notes); }
+
         function checkDatabaseSize() {
             const dataSize = JSON.stringify(data).length;
             const dataSizeMB = (dataSize / 1024 / 1024).toFixed(2);
@@ -1106,9 +1140,14 @@
             }
             if(confirm('Remove image from this project?')) {
                 p.image = null;
-                saveData(); renderProjects(); renderDashboard();
-                document.getElementById('edit-project-image-preview').innerHTML = `<p style="color:var(--text-muted);">No image attached</p>`;
-                showToast('Image removed');
+                saveProjects().then(() => {
+                    renderProjects(); renderDashboard();
+                    document.getElementById('edit-project-image-preview').innerHTML = `<p style="color:var(--text-muted);">No image attached</p>`;
+                    showToast('✅ Image removed!');
+                    checkDatabaseSize();
+                }).catch(err => {
+                    showToast('❌ Failed to remove image');
+                });
             }
         }
         function saveEditProject() {
@@ -1279,7 +1318,7 @@
         function clearPlannedInventory() {
             if (confirm('Clear all incoming orders?')) {
                 data.plannedInventory = {};
-                saveData();
+                savePlannedInventory();
                 renderIncomingOrdersTable();
                 updateIncomingOrdersCount();
                 showToast('Cleared');
@@ -1292,7 +1331,7 @@
             if (!code.match(/^[A-HM]\d{1,2}$/)) return alert('Invalid color code (e.g., A1, B12, M5)');
             if (qty <= 0) return alert('Enter a quantity > 0');
             data.plannedInventory[code] = (data.plannedInventory[code] || 0) + qty;
-            saveData();
+            savePlannedInventory();
             renderIncomingOrdersTable();
             updateIncomingOrdersCount();
             document.getElementById('add-incoming-code').value = '';
@@ -1307,14 +1346,14 @@
             } else {
                 data.plannedInventory[code] = qty;
             }
-            saveData();
+            savePlannedInventory();
             renderIncomingOrdersTable();
             updateIncomingOrdersCount();
         }
 
         function removeIncoming(code) {
             delete data.plannedInventory[code];
-            saveData();
+            savePlannedInventory();
             renderIncomingOrdersTable();
             updateIncomingOrdersCount();
             showToast(`Removed ${code}`);
@@ -1633,9 +1672,14 @@
             }
             if(confirm('Remove image from this plan?')) {
                 p.image = null;
-                saveData(); renderPlans();
-                document.getElementById('edit-plan-image-preview').innerHTML = `<p style="color:var(--text-muted);">No image attached</p>`;
-                showToast('Image removed');
+                savePlans().then(() => {
+                    renderPlans();
+                    document.getElementById('edit-plan-image-preview').innerHTML = `<p style="color:var(--text-muted);">No image attached</p>`;
+                    showToast('✅ Image removed!');
+                    checkDatabaseSize();
+                }).catch(err => {
+                    showToast('❌ Failed to remove image');
+                });
             }
         }
         function saveEditPlan() {
@@ -1899,17 +1943,23 @@
             if (type === 'project') {
                 const p = data.projects.find(x => x.name === name);
                 if (p) p.image = null;
+                saveProjects().then(() => {
+                    checkImageSizes();
+                    renderProjects();
+                    showToast('✅ Image removed!');
+                });
             } else {
                 const p = data.plans.find(x => x.name === name);
                 if (p) p.image = null;
+                savePlans().then(() => {
+                    checkImageSizes();
+                    renderPlans();
+                    showToast('✅ Image removed!');
+                });
             }
-            saveData().then(() => {
-                checkImageSizes();
-                showToast('Image removed!');
-            });
         }
 
-        function removeAllImages() {
+        async function removeAllImages() {
             const projectCount = data.projects.filter(p => p.image).length;
             const planCount = data.plans.filter(p => p.image).length;
             const total = projectCount + planCount;
@@ -1924,12 +1974,15 @@
             data.projects.forEach(p => p.image = null);
             data.plans.forEach(p => p.image = null);
 
-            saveData().then(() => {
+            try {
+                // Save projects and plans separately (incremental saves)
+                if (projectCount > 0) await saveProjects();
+                if (planCount > 0) await savePlans();
                 checkImageSizes();
                 renderProjects();
                 renderPlans();
                 showToast(`✅ Removed ${total} images!`);
-            }).catch(err => {
+            } catch(err) {
                 showToast('❌ Failed to save');
             });
         }
