@@ -479,25 +479,57 @@
     </div>
 
     <div class="modal-overlay" id="incoming-orders-modal">
-        <div class="modal" style="max-width:700px;">
-            <h2>📦 Incoming Orders</h2>
-            <p style="color:var(--text-muted);margin-bottom:15px;">Beads you've ordered but haven't arrived yet.</p>
+        <div class="modal" style="max-width:900px;">
+            <h2>📦 Incoming Orders & Planned Inventory</h2>
 
-            <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;padding:15px;background:var(--bg-input);border-radius:10px;">
-                <input type="text" id="add-incoming-code" placeholder="Code (A1)" style="width:100px;">
-                <input type="number" id="add-incoming-qty" placeholder="Qty" style="width:80px;">
-                <button class="btn-success btn-sm" onclick="addIncomingColor()">+ Add</button>
-                <button class="btn-danger btn-sm" onclick="clearPlannedInventory()">Clear All</button>
+            <!-- Tabs -->
+            <div style="display:flex;gap:10px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:10px;">
+                <button class="btn-sm btn-primary incoming-tab active" onclick="switchIncomingTab('orders')">📦 Incoming Orders</button>
+                <button class="btn-sm btn-secondary incoming-tab" onclick="switchIncomingTab('planned')">📊 Full Planned Inventory</button>
             </div>
 
-            <div style="display:flex;gap:10px;margin-bottom:15px;align-items:center;">
-                <span style="color:var(--text-muted);">Sort:</span>
-                <button class="btn-sm btn-secondary sort-btn active" id="sort-name-btn" onclick="sortIncomingOrders('name')">A-Z</button>
-                <button class="btn-sm btn-secondary sort-btn" id="sort-asc-btn" onclick="sortIncomingOrders('asc')">↑ Qty Low</button>
-                <button class="btn-sm btn-secondary sort-btn" id="sort-desc-btn" onclick="sortIncomingOrders('desc')">↓ Qty High</button>
+            <!-- Incoming Orders Tab -->
+            <div id="incoming-orders-tab">
+                <p style="color:var(--text-muted);margin-bottom:15px;">Beads you've ordered but haven't arrived yet.</p>
+
+                <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;padding:15px;background:var(--bg-input);border-radius:10px;">
+                    <input type="text" id="add-incoming-code" placeholder="Code (A1)" style="width:100px;">
+                    <input type="number" id="add-incoming-qty" placeholder="Qty" style="width:80px;">
+                    <button class="btn-success btn-sm" onclick="addIncomingColor()">+ Add</button>
+                    <button class="btn-danger btn-sm" onclick="clearPlannedInventory()">Clear All</button>
+                </div>
+
+                <div style="display:flex;gap:10px;margin-bottom:15px;align-items:center;">
+                    <span style="color:var(--text-muted);">Sort:</span>
+                    <button class="btn-sm btn-secondary sort-btn active" id="sort-name-btn" onclick="sortIncomingOrders('name')">A-Z</button>
+                    <button class="btn-sm btn-secondary sort-btn" id="sort-asc-btn" onclick="sortIncomingOrders('asc')">↑ Qty Low</button>
+                    <button class="btn-sm btn-secondary sort-btn" id="sort-desc-btn" onclick="sortIncomingOrders('desc')">↓ Qty High</button>
+                </div>
+
+                <div id="incoming-orders-table" style="max-height:300px;overflow-y:auto;"></div>
             </div>
 
-            <div id="incoming-orders-table" style="max-height:350px;overflow-y:auto;"></div>
+            <!-- Planned Inventory Tab -->
+            <div id="planned-inventory-tab" style="display:none;">
+                <p style="color:var(--text-muted);margin-bottom:15px;">Shows current inventory + incoming orders = planned total.</p>
+
+                <div style="display:flex;gap:10px;margin-bottom:15px;flex-wrap:wrap;align-items:center;">
+                    <input type="text" id="planned-inv-search" placeholder="Search (A1, B5...)" style="width:150px;" oninput="renderPlannedInventoryTable()">
+                    <span style="color:var(--text-muted);">Filter:</span>
+                    <button class="btn-sm btn-secondary planned-filter active" onclick="filterPlannedInv('')">All</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('A')">A</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('B')">B</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('C')">C</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('D')">D</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('E')">E</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('F')">F</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('G')">G</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('H')">H</button>
+                    <button class="btn-sm btn-secondary planned-filter" onclick="filterPlannedInv('M')">M</button>
+                </div>
+
+                <div id="planned-inventory-table" style="max-height:350px;overflow-y:auto;"></div>
+            </div>
 
             <div style="margin-top:20px;display:flex;gap:10px;">
                 <button class="btn-secondary" onclick="closeModal('incoming-orders-modal')">Close</button>
@@ -1394,6 +1426,111 @@
 
         // Backwards compatibility
         function renderPlannedInventory() { updateIncomingOrdersCount(); }
+
+        // Tab switching for incoming orders modal
+        function switchIncomingTab(tab) {
+            document.querySelectorAll('.incoming-tab').forEach(btn => {
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-secondary');
+            });
+            if (tab === 'orders') {
+                document.getElementById('incoming-orders-tab').style.display = 'block';
+                document.getElementById('planned-inventory-tab').style.display = 'none';
+                document.querySelector('.incoming-tab:first-child').classList.add('active', 'btn-primary');
+                document.querySelector('.incoming-tab:first-child').classList.remove('btn-secondary');
+            } else {
+                document.getElementById('incoming-orders-tab').style.display = 'none';
+                document.getElementById('planned-inventory-tab').style.display = 'block';
+                document.querySelector('.incoming-tab:last-child').classList.add('active', 'btn-primary');
+                document.querySelector('.incoming-tab:last-child').classList.remove('btn-secondary');
+                renderPlannedInventoryTable();
+            }
+        }
+
+        let plannedInvFilter = '';
+        function filterPlannedInv(letter) {
+            plannedInvFilter = letter;
+            document.querySelectorAll('.planned-filter').forEach(btn => {
+                btn.classList.remove('active');
+                if ((letter === '' && btn.textContent === 'All') || btn.textContent === letter) {
+                    btn.classList.add('active');
+                }
+            });
+            renderPlannedInventoryTable();
+        }
+
+        function renderPlannedInventoryTable() {
+            const container = document.getElementById('planned-inventory-table');
+            const search = (document.getElementById('planned-inv-search')?.value || '').toUpperCase();
+
+            let items = data.inventory.map(c => {
+                const incoming = data.plannedInventory?.[c.name] || 0;
+                return {
+                    name: c.name,
+                    color: c.color,
+                    current: c.quantity,
+                    incoming: incoming,
+                    planned: c.quantity + incoming
+                };
+            });
+
+            // Apply search filter
+            if (search) {
+                items = items.filter(c => c.name.toUpperCase().includes(search));
+            }
+
+            // Apply letter filter
+            if (plannedInvFilter) {
+                items = items.filter(c => c.name.startsWith(plannedInvFilter));
+            }
+
+            // Sort by name
+            items.sort((a, b) => {
+                const am = a.name.match(/^([A-Z])(\d+)$/), bm = b.name.match(/^([A-Z])(\d+)$/);
+                if (am && bm) return am[1] === bm[1] ? parseInt(am[2]) - parseInt(bm[2]) : am[1].localeCompare(bm[1]);
+                return a.name.localeCompare(b.name);
+            });
+
+            const totalCurrent = items.reduce((s, c) => s + c.current, 0);
+            const totalIncoming = items.reduce((s, c) => s + c.incoming, 0);
+            const totalPlanned = items.reduce((s, c) => s + c.planned, 0);
+
+            container.innerHTML = `
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:var(--bg-input);text-align:left;position:sticky;top:0;">
+                            <th style="padding:10px;border-bottom:2px solid var(--border);">Color</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);text-align:right;">Current</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);text-align:right;">Incoming</th>
+                            <th style="padding:10px;border-bottom:2px solid var(--border);text-align:right;">Planned Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(c => {
+                            const lowStock = c.planned < 200;
+                            const hasIncoming = c.incoming > 0;
+                            return `<tr style="border-bottom:1px solid var(--border);${lowStock ? 'background:rgba(239,68,68,0.1);' : ''}">
+                                <td style="padding:8px;">
+                                    <span style="display:inline-block;width:14px;height:14px;background:${c.color};border-radius:3px;margin-right:8px;vertical-align:middle;"></span>
+                                    <strong>${c.name}</strong>
+                                </td>
+                                <td style="padding:8px;text-align:right;">${c.current.toLocaleString()}</td>
+                                <td style="padding:8px;text-align:right;color:${hasIncoming ? 'var(--success)' : 'var(--text-muted)'};">${hasIncoming ? '+' + c.incoming.toLocaleString() : '-'}</td>
+                                <td style="padding:8px;text-align:right;font-weight:bold;color:${lowStock ? 'var(--danger)' : 'var(--text)'};">${c.planned.toLocaleString()}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:var(--bg-input);font-weight:bold;">
+                            <td style="padding:10px;">Total (${items.length} colors)</td>
+                            <td style="padding:10px;text-align:right;">${totalCurrent.toLocaleString()}</td>
+                            <td style="padding:10px;text-align:right;color:var(--success);">+${totalIncoming.toLocaleString()}</td>
+                            <td style="padding:10px;text-align:right;">${totalPlanned.toLocaleString()}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            `;
+        }
 
         function selectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = true); }
         function deselectAllPlans() { document.querySelectorAll('.plan-checkbox').forEach(c => c.checked = false); }
