@@ -1846,7 +1846,6 @@
                         Have: ${have}
                         ${planNeed ? ` → After plans: <span style="color:${afterPlans < 0 ? 'var(--danger)' : afterPlans < 100 ? 'var(--warning)' : 'inherit'}">${afterPlans}</span>` : ''}
                         ${incoming ? ` <span style="color:var(--success);">(+${incoming} coming)</span>` : ''}
-                        ${need > 0 ? ` | <b style="color:${urgent ? 'var(--danger)' : 'inherit'}">Buy: ${need}+</b>` : ' | <span style="color:var(--success);">OK with incoming</span>'}
                     </span>
                 </div>`
             ).join('')}` : '<p style="color:var(--success);text-align:center;">All stocked above 300!</p>';
