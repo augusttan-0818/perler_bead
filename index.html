@@ -492,11 +492,21 @@
             <div id="incoming-orders-tab">
                 <p style="color:var(--text-muted);margin-bottom:15px;">Beads you've ordered but haven't arrived yet.</p>
 
-                <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;padding:15px;background:var(--bg-input);border-radius:10px;">
+                <!-- Single add -->
+                <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center;padding:15px;background:var(--bg-input);border-radius:10px;">
                     <input type="text" id="add-incoming-code" placeholder="Code (A1)" style="width:100px;">
                     <input type="number" id="add-incoming-qty" placeholder="Qty" style="width:80px;">
                     <button class="btn-success btn-sm" onclick="addIncomingColor()">+ Add</button>
                     <button class="btn-danger btn-sm" onclick="clearPlannedInventory()">Clear All</button>
+                </div>
+
+                <!-- Bulk add -->
+                <div style="margin-bottom:20px;padding:15px;background:var(--bg-input);border-radius:10px;">
+                    <label style="color:var(--text-muted);font-size:0.9rem;">Bulk Add (e.g., A1:500, B5:1000, C3:250)</label>
+                    <div style="display:flex;gap:10px;margin-top:8px;">
+                        <input type="text" id="bulk-incoming-input" placeholder="A1:500, B5:1000, C3:250" style="flex:1;">
+                        <button class="btn-success btn-sm" onclick="addBulkIncoming()">+ Bulk Add</button>
+                    </div>
                 </div>
 
                 <div style="display:flex;gap:10px;margin-bottom:15px;align-items:center;">
@@ -1391,6 +1401,41 @@
             document.getElementById('add-incoming-code').value = '';
             document.getElementById('add-incoming-qty').value = '';
             showToast(`Added ${code}: +${qty}`);
+        }
+
+        function addBulkIncoming() {
+            const input = document.getElementById('bulk-incoming-input').value.trim();
+            if (!input) return alert('Enter beads like: A1:500, B5:1000');
+
+            const pairs = input.split(/[,;\n]+/).map(s => s.trim()).filter(s => s);
+            let added = 0;
+            let errors = [];
+
+            pairs.forEach(pair => {
+                const match = pair.match(/^([A-HMa-hm]\d{1,2})\s*[:=]\s*(\d+)$/);
+                if (match) {
+                    const code = match[1].toUpperCase();
+                    const qty = parseInt(match[2]);
+                    if (qty > 0) {
+                        data.plannedInventory[code] = (data.plannedInventory[code] || 0) + qty;
+                        added++;
+                    }
+                } else {
+                    errors.push(pair);
+                }
+            });
+
+            if (added > 0) {
+                savePlannedInventory();
+                renderIncomingOrdersTable();
+                updateIncomingOrdersCount();
+                document.getElementById('bulk-incoming-input').value = '';
+                showToast(`✅ Added ${added} colors!`);
+            }
+
+            if (errors.length > 0) {
+                alert(`Could not parse: ${errors.join(', ')}\n\nFormat: A1:500, B5:1000`);
+            }
         }
 
         function updateIncomingQty(code, val) {
